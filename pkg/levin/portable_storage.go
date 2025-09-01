@@ -270,12 +270,10 @@ func ReadAny(bytes []byte, ttype byte) (int, interface{}) {
 	}
 
 	panic(fmt.Errorf("unknown ttype %x", ttype))
-	return -1, nil
 }
 
 // reads var int, returning number of bytes read and the integer in that byte
 // sequence.
-//
 func ReadVarInt(b []byte) (int, int) {
 	sizeMask := b[0] & PortableRawSizeMarkMask
 
@@ -294,7 +292,6 @@ func ReadVarInt(b []byte) (int, int) {
 		panic(fmt.Errorf("malformed sizemask: %+v", sizeMask))
 	}
 
-	return -1, -1
 }
 
 func (s *PortableStorage) Bytes() []byte {

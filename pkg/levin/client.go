@@ -72,6 +72,18 @@ func (c *Client) Handshake(ctx context.Context) (*Node, error) {
 							Name:         "network_id",
 							Serializable: BoostString(string(MainnetNetworkId)),
 						},
+						{
+							Name:         "my_port",
+							Serializable: BoostUint32(0),
+						},
+						{
+							Name:         "peer_id",
+							Serializable: BoostUint64(uint64(time.Now().Unix())),
+						},
+						{
+							Name:         "support_flags",
+							Serializable: BoostUint32(1),
+						},
 					},
 				},
 			},
@@ -121,6 +133,34 @@ again:
 	return &peerList, nil
 }
 
+func (c *Client) ReadMessage() (*Header, *PortableStorage, error) {
+	responseHeaderB := make([]byte, LevinHeaderSizeBytes)
+	if _, err := io.ReadFull(c.conn, responseHeaderB); err != nil {
+		return nil, nil, err
+	}
+
+	respHeader, err := NewHeaderFromBytesBytes(responseHeaderB)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if respHeader.Length == 0 {
+		return respHeader, nil, nil
+	}
+
+	responseBodyB := make([]byte, respHeader.Length)
+	if _, err := io.ReadFull(c.conn, responseBodyB); err != nil {
+		return nil, nil, err
+	}
+
+	ps, err := NewPortableStorageFromBytes(responseBodyB)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return respHeader, ps, nil
+}
+
 func (c *Client) Ping(ctx context.Context) error {
 	reqHeaderB := NewRequestHeader(CommandPing, 0).Bytes()
 
@@ -138,7 +178,49 @@ func (c *Client) Ping(ctx context.Context) error {
 		return fmt.Errorf("new header from resp bytes: %w", err)
 	}
 
-	fmt.Printf("%+v\n", respHeader)
+	fmt.Printf("VVVV %+v\n", respHeader)
 
 	return nil
+}
+
+func (c *Client) SendRequest(Command uint32, payload []byte) error {
+	len := uint64(len(payload))
+	reqHeaderB := NewRequestHeader(Command, len)
+
+	if _, err := c.conn.Write(reqHeaderB.Bytes()); err != nil {
+		return fmt.Errorf("write header: %w", err)
+	}
+
+	if len > 0 {
+		if _, err := c.conn.Write(payload); err != nil {
+			return fmt.Errorf("write payload: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (c *Client) SendResponse(Command uint32, payload []byte) error {
+	len := uint64(len(payload))
+	respHeaderB := NewResponseHeader(Command, len).Bytes()
+
+	if _, err := c.conn.Write(respHeaderB); err != nil {
+		return fmt.Errorf("write header: %w", err)
+	}
+
+	if len > 0 {
+		if _, err := c.conn.Write(payload); err != nil {
+			return fmt.Errorf("write payload: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// ------------------
+
+func (c *Client) NilPayload() []byte {
+	return (&PortableStorage{
+		Entries: []Entry{},
+	}).Bytes()
 }
