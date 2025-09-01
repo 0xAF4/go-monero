@@ -1,4 +1,4 @@
-module github.com/cirocosta/go-monero
+module github.com/0xaf4/go-monero
 
 go 1.17
 

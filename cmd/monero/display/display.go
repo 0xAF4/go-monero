@@ -7,11 +7,10 @@ import (
 
 	"github.com/gosuri/uitable"
 
-	"github.com/cirocosta/go-monero/pkg/constant"
+	"github.com/0xaf4/go-monero/pkg/constant"
 )
 
 // JSON pushes to stdout a pretty printed representation of a given value `v`.
-//
 func JSON(v interface{}) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent(" ", "  ")
@@ -25,7 +24,6 @@ func JSON(v interface{}) error {
 
 // NewTable instantiates a new table instance that already has pre-defined
 // options set so it's consistent across all pretty prints of the commands.
-//
 func NewTable() *uitable.Table {
 	table := uitable.New()
 

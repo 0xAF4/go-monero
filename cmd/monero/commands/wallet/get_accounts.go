@@ -5,9 +5,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/cirocosta/go-monero/cmd/monero/display"
-	"github.com/cirocosta/go-monero/cmd/monero/options"
-	"github.com/cirocosta/go-monero/pkg/rpc/wallet"
+	"github.com/0xaf4/go-monero/cmd/monero/display"
+	"github.com/0xaf4/go-monero/cmd/monero/options"
+	"github.com/0xaf4/go-monero/pkg/rpc/wallet"
 )
 
 type getAccountsCommand struct {

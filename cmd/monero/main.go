@@ -6,10 +6,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/cirocosta/go-monero/cmd/monero/commands/address"
-	"github.com/cirocosta/go-monero/cmd/monero/commands/daemon"
-	"github.com/cirocosta/go-monero/cmd/monero/commands/p2p"
-	"github.com/cirocosta/go-monero/cmd/monero/commands/wallet"
+	"github.com/0xaf4/go-monero/cmd/monero/commands/address"
+	"github.com/0xaf4/go-monero/cmd/monero/commands/daemon"
+	"github.com/0xaf4/go-monero/cmd/monero/commands/p2p"
+	"github.com/0xaf4/go-monero/cmd/monero/commands/wallet"
 )
 
 var (

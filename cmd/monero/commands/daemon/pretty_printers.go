@@ -7,8 +7,8 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/gosuri/uitable"
 
-	"github.com/cirocosta/go-monero/cmd/monero/display"
-	"github.com/cirocosta/go-monero/pkg/rpc/daemon"
+	"github.com/0xaf4/go-monero/cmd/monero/display"
+	"github.com/0xaf4/go-monero/pkg/rpc/daemon"
 )
 
 func prettyBlockHeader(table *uitable.Table, header daemon.BlockHeader) {

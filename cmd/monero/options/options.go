@@ -8,20 +8,18 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/cirocosta/go-monero/cmd/monero/display"
-	mhttp "github.com/cirocosta/go-monero/pkg/http"
-	"github.com/cirocosta/go-monero/pkg/rpc"
-	"github.com/cirocosta/go-monero/pkg/rpc/daemon"
-	"github.com/cirocosta/go-monero/pkg/rpc/wallet"
+	"github.com/0xaf4/go-monero/cmd/monero/display"
+	mhttp "github.com/0xaf4/go-monero/pkg/http"
+	"github.com/0xaf4/go-monero/pkg/rpc"
+	"github.com/0xaf4/go-monero/pkg/rpc/daemon"
+	"github.com/0xaf4/go-monero/pkg/rpc/wallet"
 )
 
 // RootOpts are global options available to all commands under this package.
-//
 var RootOpts = &options{}
 
 // options is a set of flags that are shared between all commands in this
 // package.
-//
 type options struct {
 	address string
 	mhttp.ClientConfig
@@ -30,7 +28,6 @@ type options struct {
 
 // AddrFmter provides the function that should be used when displaying
 // addresses based on the adddresses formatting option.
-//
 func (o *options) AddrFmter() func(string) string {
 	if !o.shortenAddresses {
 		return func(s string) string {
@@ -43,14 +40,12 @@ func (o *options) AddrFmter() func(string) string {
 
 // Context generates a new `context.Context` already honouring the deadline
 // specified in the options.
-//
 func (o *options) Context() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), o.RequestTimeout)
 }
 
 // initializeFromEnv ensures that any variables not supplied via flags have
 // been captures from the set of environment variables.
-//
 func (o *options) initializeFromEnv() {
 	if address := os.Getenv("MONERO_ADDRESS"); address != "" {
 		o.address = address
@@ -58,7 +53,6 @@ func (o *options) initializeFromEnv() {
 }
 
 // Client instantiates a new daemon RPC client based on the options filled.
-//
 func (o *options) Client() (*daemon.Client, error) {
 	o.initializeFromEnv()
 
@@ -79,7 +73,6 @@ func (o *options) Client() (*daemon.Client, error) {
 
 // WalletClient instantiates a new wallet RPC client based on the options
 // filled.
-//
 func (o *options) WalletClient() (*wallet.Client, error) {
 	o.initializeFromEnv()
 
@@ -100,7 +93,6 @@ func (o *options) WalletClient() (*wallet.Client, error) {
 
 // Bind binds the flags defined by `options` to a `cobra` command so that they
 // can be filled either via comand arguments or environment variables.
-//
 func Bind(cmd *cobra.Command) {
 	cmd.PersistentFlags().BoolVarP(&RootOpts.Verbose,
 		"verbose", "v",

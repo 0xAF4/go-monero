@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"net/url"
 
-	mhttp "github.com/cirocosta/go-monero/pkg/http"
+	mhttp "github.com/0xaf4/go-monero/pkg/http"
 )
 
 const (
@@ -27,7 +27,6 @@ const (
 // Client is a wrapper over a plain HTTP client providing methods that
 // correspond to all RPC invocations to a `monerod` daemon, including
 // restricted and non-restricted ones.
-//
 type Client struct {
 	// http is the underlying http client that takes care of sending
 	// requests and receiving the responses.
@@ -45,19 +44,16 @@ type Client struct {
 
 // clientOptions is a set of options that can be overridden to tweak the
 // client's behavior.
-//
 type clientOptions struct {
 	HTTPClient *http.Client
 }
 
 // ClientOption defines a functional option for overriding optional client
 // configuration parameters.
-//
 type ClientOption func(o *clientOptions)
 
 // WithHTTPClient is a functional option for providing a custom HTTP client to
 // be used for the HTTP requests made to a monero daemon.
-//
 func WithHTTPClient(v *http.Client) func(o *clientOptions) {
 	return func(o *clientOptions) {
 		o.HTTPClient = v
@@ -69,7 +65,6 @@ func WithHTTPClient(v *http.Client) func(o *clientOptions) {
 //
 // The `address` might be either restricted (typically <ip>:18089) or not
 // (typically <ip>:18081).
-//
 func NewClient(address string, opts ...ClientOption) (*Client, error) {
 	options := &clientOptions{}
 
@@ -97,7 +92,6 @@ func NewClient(address string, opts ...ClientOption) (*Client, error) {
 }
 
 // ResponseEnvelope wraps all responses from the RPC server.
-//
 type ResponseEnvelope struct {
 	ID      string      `json:"id"`
 	JSONRPC string      `json:"jsonrpc"`
@@ -109,7 +103,6 @@ type ResponseEnvelope struct {
 }
 
 // RequestEnvelope wraps all requests made to the RPC server.
-//
 type RequestEnvelope struct {
 	ID      string      `json:"id"`
 	JSONRPC string      `json:"jsonrpc"`
@@ -118,7 +111,6 @@ type RequestEnvelope struct {
 }
 
 // Request makes requests to any endpoints, not assuming any particular format.
-//
 func (c *Client) RawRequest(ctx context.Context, endpoint string, params interface{}, response interface{}) error {
 	address := *c.address
 	address.Path = endpoint
@@ -151,7 +143,6 @@ func (c *Client) RawRequest(ctx context.Context, endpoint string, params interfa
 // JSONRPC issues a request for a particular method under the JSONRPC endpoint
 // with the proper envolope for its requests and unwrapping of results for
 // responses.
-//
 func (c *Client) JSONRPC(ctx context.Context, method string, params interface{}, response interface{}) error {
 	address := *c.address
 	address.Path = endpointJSONRPC
@@ -193,7 +184,6 @@ func (c *Client) JSONRPC(ctx context.Context, method string, params interface{},
 
 // submitRequest performs any generic HTTP request to the monero node targeted
 // by this client making no assumptions about a particular endpoint.
-//
 func (c *Client) submitRequest(req *http.Request, response interface{}) error {
 	resp, err := c.http.Do(req)
 	if err != nil {

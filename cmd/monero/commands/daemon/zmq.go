@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/cirocosta/go-monero/cmd/monero/display"
-	"github.com/cirocosta/go-monero/pkg/zmq"
+	"github.com/0xaf4/go-monero/cmd/monero/display"
+	"github.com/0xaf4/go-monero/pkg/zmq"
 )
 
 type zmqCommand struct {

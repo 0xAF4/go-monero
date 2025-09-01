@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/cirocosta/go-monero/pkg/monero"
+	"github.com/0xaf4/go-monero/pkg/monero"
 )
 
 func TestSeed(t *testing.T) {
