@@ -161,28 +161,7 @@ func (c *Client) ReadMessage() (*Header, *PortableStorage, error) {
 	return respHeader, ps, nil
 }
 
-func (c *Client) Ping(ctx context.Context) error {
-	reqHeaderB := NewRequestHeader(CommandPing, 0).Bytes()
-
-	if _, err := c.conn.Write(reqHeaderB); err != nil {
-		return fmt.Errorf("write: %w", err)
-	}
-
-	responseHeaderB := make([]byte, LevinHeaderSizeBytes)
-	if _, err := io.ReadFull(c.conn, responseHeaderB); err != nil {
-		return fmt.Errorf("read full header: %w", err)
-	}
-
-	respHeader, err := NewHeaderFromBytesBytes(responseHeaderB)
-	if err != nil {
-		return fmt.Errorf("new header from resp bytes: %w", err)
-	}
-
-	fmt.Printf("VVVV %+v\n", respHeader)
-
-	return nil
-}
-
+// c.SendRequest(levin.CommandPing, c.NilPayload())
 func (c *Client) SendRequest(Command uint32, payload []byte) error {
 	len := uint64(len(payload))
 	reqHeaderB := NewRequestHeader(Command, len)
