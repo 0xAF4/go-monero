@@ -17,10 +17,12 @@ var cRPCDaemonNodes = []string{
 }
 
 const (
-	cRetriesCount = 3
+	cRetriesCount     = 3
+	cErrorTxtTemplate = "Error(%d) of calling %s method: %w"
 
-	cGetBlocks             = "/get_blocks_by_height"
+	cGetBlocks             = "/get_blocks_by_height.bin"
 	cGetTransaction        = "/get_transactions"
 	cGetOutputDistribution = "/get_output_distribution"
 	cGetOuts               = "/get_outs"
+	cSendRawTransaction    = "/send_raw_transaction"
 )
