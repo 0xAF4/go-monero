@@ -6,6 +6,7 @@ import (
 	"io"
 	"math/rand/v2"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -33,7 +34,12 @@ func (c *Client) cycleCall(method string, data []byte) ([]byte, error) {
 func (c *Client) call(method string, data []byte) ([]byte, error) {
 	url := getRandomDaemonNode() + method
 
-	resp, err := http.Post(url, "application/json", bytes.NewReader(data))
+	contentType := "application/json"
+	if strings.HasSuffix(method, ".bin") {
+		contentType = "application/octet-stream"
+	}
+
+	resp, err := http.Post(url, contentType, bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("http post to %s failed: %w", url, err)
 	}

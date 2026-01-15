@@ -19,7 +19,7 @@ func Test_DaemonRPC_GetBlocks(t *testing.T) {
 		t.Fatal("response is nil")
 	}
 
-	for key, val := range *resp {
-		fmt.Println(key, ":", val)
+	for _, block := range resp {
+		fmt.Printf("block: %s\n", block.GetBlockId())
 	}
 }

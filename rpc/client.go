@@ -1,22 +1,20 @@
 package rpc
 
 import (
-	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/0xAF4/go-monero/levin"
+	"github.com/0xAF4/go-monero/types"
 )
 
-type UniversalRequest map[string]interface{}
-
-type Client struct {
-}
+type Client struct{}
 
 func NewDaemonRPCClient() *Client {
 	return &Client{}
 }
 
-func (c *Client) GetBlocks(heights []uint64) (*UniversalRequest, error) {
+func (c *Client) GetBlocks(heights []uint64) ([]*types.Block, error) {
 	req := UniversalRequest{
 		"heights": heights,
 	}
@@ -27,54 +25,51 @@ func (c *Client) GetBlocks(heights []uint64) (*UniversalRequest, error) {
 		return nil, fmt.Errorf(cErrorTxtTemplate, 1, cGetBlocks, err)
 	}
 
-	fmt.Printf("response: %x\n", response)
-	// Ответ приходит в бинарном формате (portable storage)
-	rStorage, err := levin.NewPortableStorageFromBytes(response)
-	if err != nil {
+	resp := make(UniversalRequest)
+	if err := resp.FromPortableStorate(response); err != nil {
 		return nil, fmt.Errorf(cErrorTxtTemplate, 2, cGetBlocks, err)
 	}
 
-	resp := make(UniversalRequest)
-	resp.FromPortableStorate(*rStorage)
+	if strings.ToLower(resp["status"].(string)) != "ok" {
+		return nil, fmt.Errorf("error, request is not ok!")
+	}
 
-	return &resp, nil
+	var blocksArr []*types.Block
+	for _, blk := range resp["blocks"].(levin.Entries) {
+		block := types.NewBlock()
+		for _, ibl := range blk.Entries() {
+			if ibl.Name == "block" {
+				block.SetBlockData([]byte(ibl.String()))
+			}
+			if ibl.Name == "txs" {
+				for _, itx := range ibl.Entries() {
+					block.InsertTx([]byte(itx.String()))
+				}
+			}
+		}
+		blocksArr = append(blocksArr, block)
+	}
+
+	for _, blk := range blocksArr {
+		blk.FullfillBlockHeader()
+	}
+
+	return blocksArr, nil
 }
 
-func (u UniversalRequest) MarshalToJson() []byte {
-	js, err := json.Marshal(u)
+func (c *Client) GetTransactions(txIds []string) (*UniversalRequest, error) {
+	req := UniversalRequest{
+		"txs_hashes":     txIds,
+		"decode_as_json": false,
+		"prunable":       false,
+	}
+
+	response, err := c.cycleCall(cGetTransaction, req.MarshalToJson())
 	if err != nil {
-		panic(fmt.Errorf("failed to marshal json: %w", err))
+		return nil, fmt.Errorf(cErrorTxtTemplate, 1, cGetBlocks, err)
 	}
-	return js
-}
 
-func (u UniversalRequest) MarshalToBlob() []byte {
-	pStorage := levin.PortableStorage{
-		Entries: []levin.Entry{},
-	}
-	for key, val := range u {
-		var sVal levin.Serializable
-		switch v := val.(type) {
-		case string:
-			sVal = levin.BoostString(v)
-		case uint64:
-			sVal = levin.BoostUint64(v)
-		case []uint64:
-			sVal = levin.BoostTxIDs(v)
-		default:
-			panic(fmt.Errorf("unsupported type for key %s: %T", key, val))
-		}
-		entry := levin.Entry{
-			Name:         key,
-			Serializable: sVal,
-		}
-		pStorage.Entries = append(pStorage.Entries, entry)
-	}
-	return pStorage.Bytes()
-}
-
-func (u *UniversalRequest) FromPortableStorate(rStorage levin.PortableStorage) {
-	for _, val := range rStorage.Entries {
-		(*u)[val.Name] = val.Value
-	}
+	resp := make(UniversalRequest)
+	resp.FromJson(response)
+	return
 }

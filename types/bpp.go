@@ -1,0 +1,669 @@
+package types
+
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+
+	"filippo.io/edwards25519"
+	"github.com/0xAF4/go-monero/util"
+)
+
+type Exponent struct {
+	Transcript util.Key
+	MaxN       int
+	MaxM       int
+	Gi_p3      []*edwards25519.Point
+	Hi_p3      []*edwards25519.Point
+}
+
+// MultiexpData содержит скаляр и точку для multiexponentiation
+type MultiexpData struct {
+	Scalar util.Key
+	Point  *edwards25519.Point
+}
+
+const maxN = 64
+const maxM = 16
+
+func (t *Transaction) signBpp() (Bpp, error) {
+	bpp := Bpp{}
+	// Bulletproof Plus для доказательства, что суммы выходов положительные
+	// без раскрытия самих сумм
+	amounts := []uint64{}
+	for _, val := range t.BlindAmounts {
+		amounts = append(amounts, val)
+	}
+
+	bpp, err := createBulletproofPlus(amounts, t.BlindScalars)
+	if err != nil {
+		return Bpp{}, fmt.Errorf("failed to create bulletproof: %w", err)
+	}
+
+	return bpp, nil
+}
+
+// Given two scalar arrays, construct a vector pre-commitment:
+//
+// a = (a_0, ..., a_{n-1})
+// b = (b_0, ..., b_{n-1})
+//
+// Outputs a_0*Gi_0 + ... + a_{n-1}*Gi_{n-1} +
+//
+//	b_0*Hi_0 + ... + b_{n-1}*Hi_{n-1}
+func vectorExponent(a, b []util.Key, exponent Exponent) *edwards25519.Point {
+	// Результат - сумма всех произведений
+	result := edwards25519.NewIdentityPoint()
+
+	for i := 0; i < len(a); i++ {
+		// a[i] * Gi[i]
+		aScalar := a[i].KeyToScalar()
+		giPoint := exponent.Gi_p3[i] // Gi должен быть массив точек
+		term1 := new(edwards25519.Point).ScalarMult(aScalar, giPoint)
+		result.Add(result, term1)
+
+		// b[i] * Hi[i]
+		bScalar := b[i].KeyToScalar()
+		hiPoint := exponent.Hi_p3[i] // Hi должен быть массив точек
+		term2 := new(edwards25519.Point).ScalarMult(bScalar, hiPoint)
+		result.Add(result, term2)
+	}
+
+	return result
+}
+
+func computeA(alpha *edwards25519.Scalar, aL8, aR8 []util.Key, expn Exponent) Hash {
+	var (
+		A     util.Key
+		temp  util.Key
+		pre_A util.Key
+	)
+	// pre_A, _ := ParseKeyFromHex("78ae20b0e83dc61b5c0864b15245040f818c9f027e56a0bd807cc4c7ba50dca4")
+	point := vectorExponent(aL8, aR8, expn)
+	pre_A = util.Key(point.Bytes())
+
+	tempScalar := new(edwards25519.Scalar).Multiply(alpha, util.INV_EIGHT_E)
+	temp.FromPoint(new(edwards25519.Point).ScalarBaseMult(tempScalar))
+	util.AddKeys(&A, &pre_A, &temp)
+
+	return A.ToBytes()
+}
+
+func AmountToScalar(amount uint64) *edwards25519.Scalar {
+	amountBytes := make([]byte, 32)
+	binary.LittleEndian.PutUint64(amountBytes, amount)
+	amountScalar, _ := new(edwards25519.Scalar).SetCanonicalBytes(amountBytes)
+	return amountScalar
+}
+
+// createBulletproofPlus создает Bulletproof Plus доказательство
+func createBulletproofPlus(amounts []uint64, masks []*edwards25519.Scalar) (Bpp, error) {
+	if len(amounts) != len(masks) {
+		return Bpp{}, fmt.Errorf("amounts and masks length mismatch")
+	}
+
+	const (
+		logN = 6
+		N    = 1 << logN
+		maxM = 16 // Максимальное количество outputs в одном bulletproof
+	)
+
+	logM := 0
+	M := 1
+	for M <= maxM && M < len(masks) {
+		logM++
+		M = 1 << logM
+	}
+
+	if M > maxM {
+		return Bpp{}, fmt.Errorf("sv/gamma are too large")
+	}
+
+	logMN := logM + logN
+	MN := M * N
+
+	aL := make([]util.Key, MN)
+	aR := make([]util.Key, MN)
+	aL8 := make([]util.Key, MN)
+	aR8 := make([]util.Key, MN)
+	temp := util.Key{}
+	temp2 := util.Key{}
+
+	V := make([]util.Key, len(masks))
+	for i, mask := range masks {
+		var (
+			gamma8Key util.Key
+			sv8Key    util.Key
+			HKey      util.Key
+		)
+
+		gamma8 := new(edwards25519.Scalar).Multiply(mask, util.INV_EIGHT_E)
+		amountScalar := AmountToScalar(amounts[i])
+		sv8 := new(edwards25519.Scalar).Multiply(amountScalar, util.INV_EIGHT_E)
+		H := getH()
+
+		gamma8Key.FromScalar(gamma8)
+		sv8Key.FromScalar(sv8)
+		HKey.FromPoint(H)
+
+		util.AddKeys2(&V[i], &gamma8Key, &sv8Key, &HKey)
+	}
+
+	for j := 0; j < M; j++ {
+		for i := N - 1; i >= 0; i-- {
+			amountBytes := make([]byte, 8)
+			binary.LittleEndian.PutUint64(amountBytes, amounts[j])
+			if j < len(amounts) && (amountBytes[i/8]&(1<<(i%8))) != 0 {
+				aL[j*N+i] = util.Identity
+				aL8[j*N+i] = util.INV_EIGHT
+				aR[j*N+i] = util.Zero
+				aR8[j*N+i] = util.Zero
+			} else {
+				aL[j*N+i] = util.Zero
+				aL8[j*N+i] = util.Zero
+				aR[j*N+i] = util.MINUS_ONE
+				aR8[j*N+i] = util.MINUS_INV_EIGHT
+			}
+		}
+	}
+
+	exponent := initExponents(maxN, maxM)
+
+	var buf bytes.Buffer
+	for _, v := range V {
+		buf.Write(v[:])
+	}
+
+	exponent.Transcript = util.TranscriptUpdate(&exponent.Transcript, util.HashToScalar(buf.Bytes()).ToBytes2())
+	bpp := Bpp{}
+
+	// Генерируем криптографически стойкие случайные скаляры
+	alpha := randomScalar()
+
+	bpp.A = computeA(alpha, aL8, aR8, *exponent)
+
+	y := util.TranscriptUpdate(&exponent.Transcript, bpp.A[:])
+	exponent.Transcript = *util.HashToScalar(y.ToBytes2())
+	z := exponent.Transcript
+	z_squared := new(util.Key)
+	util.ScMul(z_squared, z, z)
+
+	d := createWindowedVector(*z_squared, N, M)
+	yPowers := vectorOfScalarPowers(y, MN+2)
+
+	aL1 := vectorSubtract(aL, z)
+	aR1 := vectorAdd(aR, z)
+
+	dy := make([]util.Key, MN)
+	for i := 0; i < MN; i++ {
+		util.ScMul(&dy[i], d[i], yPowers[MN-i])
+	}
+	aR1 = vectorAdd2(aR1, dy)
+
+	alpha1 := new(util.Key)
+	alpha1.FromScalar(alpha)
+
+	temp = util.ONE
+	for j := 0; j < len(amounts); j++ {
+		util.ScMul(&temp, temp, *z_squared)
+		util.ScMul(&temp2, yPowers[MN+1], temp)
+		gamma := new(util.Key)
+		gamma.FromScalar(masks[j])
+		util.ScMulAdd(alpha1, &temp2, gamma, alpha1)
+	}
+
+	nprime := MN
+	Gprime := make([]edwards25519.Point, MN)
+	Hprime := make([]edwards25519.Point, MN)
+	aprime := make([]util.Key, MN)
+	bprime := make([]util.Key, MN)
+
+	yinv := util.Key{}
+	yinv.FromScalar(new(edwards25519.Scalar).Invert(y.KeyToScalar()))
+	yinvpow := make([]util.Key, MN)
+	yinvpow[0] = util.ONE
+	for i := 0; i < MN; i++ {
+		Gprime[i] = *exponent.Gi_p3[i]
+		Hprime[i] = *exponent.Hi_p3[i]
+		if i > 0 {
+			util.ScMul(&yinvpow[i], yinvpow[i-1], yinv)
+		}
+		aprime[i] = aL1[i]
+		bprime[i] = aR1[i]
+	}
+	L := make([]edwards25519.Point, logMN)
+	R := make([]edwards25519.Point, logMN)
+	round := 0
+
+	// Inner-product rounds
+	for nprime > 1 {
+		nprime /= 2
+
+		// Вычисляем cL и cR
+		cL := weightedInnerProduct(slice(aprime, 0, nprime), slice(bprime, nprime, len(bprime)), y)
+		cR := weightedInnerProduct(vectorScalar(slice(aprime, nprime, len(aprime)), yPowers[nprime]), slice(bprime, 0, nprime), y)
+
+		// Генерируем случайные dL и dR
+		dL := util.RandomScalar()
+		dL.FromScalar(randomScalar())
+
+		dR := util.RandomScalar()
+		dR.FromScalar(randomScalar())
+
+		// Вычисляем L[round] и R[round]
+		L[round] = computeLR(nprime, yinvpow[nprime], &Gprime, nprime, &Hprime, 0, aprime, 0, bprime, nprime, cL, *dL)
+		R[round] = computeLR(nprime, yPowers[nprime], &Gprime, 0, &Hprime, nprime, aprime, nprime, bprime, 0, cR, *dR)
+
+		// Обновляем transcript и получаем challenge
+		var buff bytes.Buffer
+		buff.Write(L[round].Bytes())
+		buff.Write(R[round].Bytes())
+		challenge := util.TranscriptUpdate(&exponent.Transcript, buff.Bytes())
+
+		// Вычисляем обратный challenge
+		challengeInv := util.Key{}
+		challengeInv.FromScalar(new(edwards25519.Scalar).Invert(challenge.KeyToScalar()))
+
+		// temp = yinvpow[nprime] * challenge
+		var temp util.Key
+		util.ScMul(&temp, yinvpow[nprime], challenge)
+
+		// Hadamard fold для Gprime
+		hadamardFold(&Gprime, challengeInv, temp)
+		hadamardFold(&Hprime, challenge, challengeInv)
+
+		// temp = challenge_inv * y_powers[nprime]
+		util.ScMul(&temp, challengeInv, yPowers[nprime])
+
+		// Обновляем aprime
+		aprime = vectorAdd2(
+			vectorScalar(slice(aprime, 0, nprime), challenge),
+			vectorScalar(slice(aprime, nprime, len(aprime)), temp),
+		)
+
+		// Обновляем bprime
+		bprime = vectorAdd2(
+			vectorScalar(slice(bprime, 0, nprime), challengeInv),
+			vectorScalar(slice(bprime, nprime, len(bprime)), challenge),
+		)
+
+		var challengeSquared util.Key
+		var challengeSquaredInv util.Key
+
+		util.ScMul(&challengeSquared, challenge, challenge)
+		util.ScMul(&challengeSquaredInv, challengeInv, challengeInv)
+		util.ScMulAdd(alpha1, dL, &challengeSquared, alpha1)
+		util.ScMulAdd(alpha1, dR, &challengeSquaredInv, alpha1)
+
+		round++
+
+	}
+
+	for i := range L {
+		bpp.L = append(bpp.L, Hash(L[i].Bytes()))
+		bpp.R = append(bpp.R, Hash(R[i].Bytes()))
+	}
+
+	r := util.RandomScalar()
+	r.FromScalar(randomScalar())
+	s := util.RandomScalar()
+	s.FromScalar(randomScalar())
+	d_ := util.RandomScalar()
+	d_.FromScalar(randomScalar())
+	eta := util.RandomScalar()
+	eta.FromScalar(randomScalar())
+
+	// Подготовка данных для A1
+	A1Data := make([]MultiexpData, 4)
+
+	util.ScMul(&A1Data[0].Scalar, *r, util.INV_EIGHT)
+	A1Data[0].Point = &Gprime[0]
+
+	util.ScMul(&A1Data[1].Scalar, *s, util.INV_EIGHT)
+	A1Data[1].Point = &Hprime[0]
+
+	util.ScMul(&A1Data[2].Scalar, *d_, util.INV_EIGHT)
+	A1Data[2].Point = edwards25519.NewGeneratorPoint()
+
+	util.ScMul(&temp, *r, y)
+	util.ScMul(&temp, temp, bprime[0])
+	util.ScMul(&temp2, *s, y)
+	util.ScMul(&temp2, temp2, aprime[0])
+	util.ScAdd(&temp, &temp, &temp2)
+	util.ScMul(&A1Data[3].Scalar, temp, util.INV_EIGHT)
+	A1Data[3].Point = getH()
+
+	A1Key := multiexp(A1Data)
+	A1Point, _ := new(edwards25519.Point).SetBytes(A1Key[:])
+	A1 := *A1Point
+	bpp.A1 = Hash(A1.Bytes())
+
+	util.ScMul(&temp, *r, y)
+	util.ScMul(&temp, temp, *s)
+	util.ScMul(&temp, temp, util.INV_EIGHT)
+	util.ScMul(&temp2, *eta, util.INV_EIGHT)
+
+	var B util.Key
+	HKey := util.Key{}
+	HKey.FromPoint(getH())
+	util.AddKeys2(&B, &temp2, &temp, &HKey)
+	bpp.B = Hash(B.ToBytes2())
+
+	var buffE bytes.Buffer
+	buffE.Write(A1.Bytes())
+	buffE.Write(B[:])
+	e := util.TranscriptUpdate(&exponent.Transcript, buffE.Bytes())
+
+	var eSquared util.Key
+	util.ScMul(&eSquared, e, e)
+
+	var r1 util.Key
+	util.ScMulAdd(&r1, &aprime[0], &e, r)
+	bpp.R1 = Hash(r1.ToBytes2())
+
+	var s1 util.Key
+	util.ScMulAdd(&s1, &bprime[0], &e, s)
+	bpp.S1 = Hash(s1.ToBytes2())
+
+	var d1 util.Key
+	util.ScMulAdd(&d1, d_, &e, eta)
+	util.ScMulAdd(&d1, alpha1, &eSquared, &d1)
+	bpp.D1 = Hash(d1.ToBytes2())
+
+	return bpp, nil
+}
+
+// Создаем windowed vector d
+func createWindowedVector(zSquared util.Key, N, M int) []util.Key {
+	MN := M * N
+	d := make([]util.Key, MN)
+
+	for i := range d {
+		d[i] = util.Zero
+	}
+
+	d[0] = zSquared
+
+	for i := 1; i < N; i++ {
+		util.ScMul(&d[i], d[i-1], util.TWO)
+	}
+
+	for j := 1; j < M; j++ {
+		for i := 0; i < N; i++ {
+			util.ScMul(&d[j*N+i], d[(j-1)*N+i], zSquared)
+		}
+	}
+
+	return d
+}
+
+// vectorOfScalarPowers создает вектор степеней скаляра: [1, x, x^2, x^3, ..., x^(n-1)]
+func vectorOfScalarPowers(x util.Key, n int) []util.Key {
+	if n == 0 {
+		panic("Need n > 0")
+	}
+
+	res := make([]util.Key, n)
+	res[0] = util.Identity
+	if n == 1 {
+		return res
+	}
+
+	res[1] = x
+	for i := 2; i < n; i++ {
+		util.ScMul(&res[i], res[i-1], x)
+	}
+
+	return res
+}
+
+// vectorSubtract вычитает скаляр из всех элементов вектора
+// res[i] = a[i] - b
+func vectorSubtract(a []util.Key, b util.Key) []util.Key {
+	res := make([]util.Key, len(a))
+
+	for i := 0; i < len(a); i++ {
+		util.ScSub(&res[i], &a[i], &b)
+	}
+
+	return res
+}
+
+func vectorAdd(a []util.Key, b util.Key) []util.Key {
+	res := make([]util.Key, len(a))
+
+	for i := 0; i < len(a); i++ {
+		util.ScAdd(&res[i], &a[i], &b)
+	}
+
+	return res
+}
+
+func vectorAdd2(a []util.Key, b []util.Key) []util.Key {
+	res := make([]util.Key, len(a))
+
+	for i := 0; i < len(a); i++ {
+		util.ScAdd(&res[i], &a[i], &b[i])
+	}
+
+	return res
+}
+
+func slice(arr []util.Key, start, end int) []util.Key {
+	return arr[start:end]
+}
+
+// weightedInnerProduct вычисляет взвешенное внутреннее произведение
+// res = sum(a[i] * b[i] * y^(i+1)) для i от 0 до len(a)-1
+func weightedInnerProduct(a, b []util.Key, y util.Key) util.Key {
+	if len(a) != len(b) {
+		panic("Incompatible sizes of a and b")
+	}
+
+	res := util.Zero
+	yPower := util.Identity // y^0 = 1
+	var temp util.Key
+
+	for i := 0; i < len(a); i++ {
+		util.ScMul(&temp, a[i], b[i])
+		util.ScMul(&yPower, yPower, y)
+		util.ScMulAdd(&res, &temp, &yPower, &res)
+	}
+
+	return res
+}
+
+// vectorScalar умножает каждый элемент вектора на скаляр
+// res[i] = a[i] * b
+func vectorScalar(a []util.Key, b util.Key) []util.Key {
+	res := make([]util.Key, len(a))
+
+	for i := 0; i < len(a); i++ {
+		util.ScMul(&res[i], a[i], b)
+	}
+
+	return res
+}
+
+// computeLR вычисляет L или R для inner product argument
+func computeLR(size int, y util.Key, G *[]edwards25519.Point, G0 int, H *[]edwards25519.Point, H0 int,
+	a []util.Key, a0 int, b []util.Key, b0 int, c util.Key, d util.Key) edwards25519.Point {
+
+	// Проверки размеров
+	if size+G0 > len(*G) {
+		panic(fmt.Sprintf("Incompatible size for G: size=%d, G0=%d, len(G)=%d", size, G0, len(*G)))
+	}
+	if size+H0 > len(*H) {
+		panic(fmt.Sprintf("Incompatible size for H: size=%d, H0=%d, len(H)=%d", size, H0, len(*H)))
+	}
+	if size+a0 > len(a) {
+		panic(fmt.Sprintf("Incompatible size for a: size=%d, a0=%d, len(a)=%d", size, a0, len(a)))
+	}
+	if size+b0 > len(b) {
+		panic(fmt.Sprintf("Incompatible size for b: size=%d, b0=%d, len(b)=%d", size, b0, len(b)))
+	}
+	if size > maxN*maxM {
+		panic(fmt.Sprintf("size is too large: %d > %d", size, maxN*maxM))
+	}
+
+	// Создаем массив для multiexp
+	multiexpData := make([]MultiexpData, size*2+2)
+
+	var temp util.Key
+
+	// Заполняем данные для G и H
+	for i := 0; i < size; i++ {
+		// temp = a[a0+i] * y
+		util.ScMul(&temp, a[a0+i], y)
+
+		// scalar = temp * INV_EIGHT
+		util.ScMul(&multiexpData[i*2].Scalar, temp, util.INV_EIGHT)
+		multiexpData[i*2].Point = &(*G)[G0+i]
+
+		// scalar = b[b0+i] * INV_EIGHT
+		util.ScMul(&multiexpData[i*2+1].Scalar, b[b0+i], util.INV_EIGHT)
+		multiexpData[i*2+1].Point = &(*H)[H0+i]
+	}
+
+	// Добавляем c * H
+	util.ScMul(&multiexpData[2*size].Scalar, c, util.INV_EIGHT)
+	multiexpData[2*size].Point = getH() // H базовая точка
+
+	// Добавляем d * G
+	util.ScMul(&multiexpData[2*size+1].Scalar, d, util.INV_EIGHT)
+	multiexpData[2*size+1].Point = edwards25519.NewGeneratorPoint() // G базовая точка
+
+	// Вычисляем multiexp
+	key := multiexp(multiexpData)
+	return *key.KeyToPoint()
+}
+
+// multiexp вычисляет multi-scalar multiplication: sum(scalar[i] * point[i])
+func multiexp(data []MultiexpData) util.Key {
+	// Результат - сумма всех scalar[i] * point[i]
+	result := edwards25519.NewIdentityPoint()
+
+	for _, d := range data {
+		scalar := d.Scalar.KeyToScalar()
+		term := new(edwards25519.Point).ScalarMult(scalar, d.Point)
+		result.Add(result, term)
+	}
+
+	return util.Key(result.Bytes())
+}
+
+// hadamardFold складывает вектор точек пополам используя линейную комбинацию
+// v[i] = a*v[i] + b*v[i+sz] для i < sz, затем уменьшает размер вектора вдвое
+func hadamardFold(v *[]edwards25519.Point, a, b util.Key) {
+	if len(*v)%2 != 0 {
+		panic("Vector size should be even")
+	}
+
+	sz := len(*v) / 2
+
+	// Создаем новый вектор для результата
+	result := make([]edwards25519.Point, sz)
+
+	// Преобразуем скаляры
+	aScalar := a.KeyToScalar()
+	bScalar := b.KeyToScalar()
+
+	for n := 0; n < sz; n++ {
+		term1 := new(edwards25519.Point).ScalarMult(aScalar, &(*v)[n])
+		term2 := new(edwards25519.Point).ScalarMult(bScalar, &(*v)[sz+n])
+		result[n] = *new(edwards25519.Point).Add(term1, term2)
+	}
+
+	*v = result
+}
+
+func initExponents(mN, mM int) *Exponent {
+	exp := Exponent{
+		Transcript: util.INITIAL_TRANSCRIPT,
+		MaxN:       mN,
+		MaxM:       mM,
+		Gi_p3:      make([]*edwards25519.Point, mN*mM),
+		Hi_p3:      make([]*edwards25519.Point, mN*mM),
+	}
+
+	// H - базовая точка (как rct::H в Monero)
+	H := getH() // или edwards25519.NewGeneratorPoint() если нужен G
+
+	for i := 0; i < mN*mM; i++ {
+		exp.Hi_p3[i] = getExponent(H, i*2)
+		exp.Gi_p3[i] = getExponent(H, i*2+1)
+	}
+
+	return &exp
+}
+
+// get_exponent генерирует точки для bulletproofs
+func getExponent(base *edwards25519.Point, idx int) *edwards25519.Point {
+	// Hash base point и индекс
+	var buf bytes.Buffer
+	buf.Write(base.Bytes())
+	buf.Write([]byte("bulletproof_plus"))
+	buf.Write(util.EncodeVarint(uint64(idx)))
+	rbytes := util.Keccak256(buf.Bytes())
+
+	key := new(util.Key)
+	key2 := new(util.Key)
+	key.FromBytes([32]byte(rbytes))
+	r := key.HashToEC()
+	r.ToBytes(key2)
+	b := key2.ToBytes()
+	point, _ := new(edwards25519.Point).SetBytes(b[:])
+	return point
+}
+
+func (t *Transaction) calculatePseudoOuts() ([]Hash, error) {
+	if len(t.Inputs) == 0 {
+		return nil, fmt.Errorf("no inputs available")
+	}
+
+	pseudoOuts := make([]Hash, len(t.Inputs))
+	sumpouts := edwards25519.NewScalar()
+
+	for i := range len(t.Inputs) - 1 {
+		randomMask := util.RandomScalar()
+		t.InputScalars = append(t.InputScalars, randomMask.KeyToScalar())
+		sumpouts.Add(sumpouts, randomMask.KeyToScalar())
+		amountAtomic := uint64(t.PInputs[i]["amount"].(float64) * 1e12)
+		pseudoOut, err := CalcCommitment(amountAtomic, randomMask.ToBytes())
+		if err != nil {
+			return []Hash{}, fmt.Errorf("Error of calc commitment: %w", err)
+		}
+
+		pseudoOuts[i] = Hash(pseudoOut)
+	}
+
+	lastI := len(pseudoOuts) - 1
+	amountAtomic := uint64(t.PInputs[lastI]["amount"].(float64) * 1e12)
+
+	sumouts, err := CalcScalars(t.BlindScalars)
+	if err != nil {
+		return []Hash{}, fmt.Errorf("Error of calc output amounts: %w", err)
+	}
+
+	mask := new(edwards25519.Scalar).Subtract(sumouts, sumpouts)
+
+	t.InputScalars = append(t.InputScalars, mask)
+	pseudoOut, err := CalcCommitment(amountAtomic, [32]byte(mask.Bytes()))
+	if err != nil {
+		return []Hash{}, fmt.Errorf("Error of calc commitment: %w", err)
+	}
+
+	pseudoOuts[lastI] = Hash(pseudoOut)
+
+	return pseudoOuts, nil
+}
+
+// randomScalar генерирует криптографически стойкий случайный скаляр
+func randomScalar() *edwards25519.Scalar {
+	var buf [64]byte
+	binary.LittleEndian.PutUint64(buf[:8], 1) //
+	// rand.Read(buf[:])
+	scalar := new(edwards25519.Scalar)
+	scalar.SetUniformBytes(buf[:])
+	return scalar
+}

@@ -190,6 +190,40 @@ func (txIds BoostTxIDs) Bytes() []byte {
 	return buf.Bytes()
 }
 
+// Добавьте этот код в конец файла levin/boost.go
+
+type BoostUint64Array []uint64
+
+func (uints BoostUint64Array) Bytes() []byte {
+	if len(uints) == 0 {
+		return []byte{
+			BoostSerializeTypeUint64 | BoostSerializeFlagArray,
+			0x00, // varint для длины 0
+		}
+	}
+
+	var buf bytes.Buffer
+
+	// Тип: uint64 array
+	buf.WriteByte(BoostSerializeTypeUint64 | BoostSerializeFlagArray)
+
+	// Длина массива в varint
+	varInB, err := VarIn(len(uints))
+	if err != nil {
+		panic(fmt.Errorf("varin for array length: %w", err))
+	}
+	buf.Write(varInB)
+
+	// Каждый uint64 как varint (не как фиксированные 8 байт!)
+	for _, val := range uints {
+		b := make([]byte, 8)
+		binary.LittleEndian.PutUint64(b, val)
+		buf.Write(b)
+	}
+
+	return buf.Bytes()
+}
+
 type BoostBlock []string
 
 func (blockIds BoostBlock) Bytes() []byte {
