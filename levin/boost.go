@@ -254,3 +254,17 @@ func (blockIds BoostBlock) Bytes() []byte {
 
 	return buf.Bytes()
 }
+
+type BoostBool bool
+
+func (b BoostBool) Bytes() []byte {
+	result := []byte{BoostSerializeTypeBool}
+
+	if b {
+		result = append(result, 0x01)
+	} else {
+		result = append(result, 0x00)
+	}
+
+	return result
+}

@@ -67,7 +67,7 @@ func (c *Client) GetTransactions(txIds []string) (*[]UniversalRequest, error) {
 
 	response, err := c.cycleCall(cGetTransaction, req.MarshalToJson())
 	if err != nil {
-		return nil, fmt.Errorf(cErrorTxtTemplate, 1, cGetBlocks, err)
+		return nil, fmt.Errorf(cErrorTxtTemplate, 1, cGetTransaction, err)
 	}
 
 	resp := make(UniversalRequest)
@@ -98,4 +98,36 @@ func (c *Client) GetTransactions(txIds []string) (*[]UniversalRequest, error) {
 	}
 
 	return &txs, nil
+}
+
+func (c *Client) GetOutputDistribution(currentBlockHeight uint64) ([]uint64, error) {
+	req := UniversalRequest{
+		"amounts":     []uint64{0},
+		"from_height": currentBlockHeight - 10,
+		"cumulative":  true,
+		"binary":      false,
+		"compress":    false,
+	}
+
+	// Для /get_blocks_by_height.bin используем JSON в запросе
+	response, err := c.cycleCall(cGetOutputDistribution, req.MarshalToBlob())
+	if err != nil {
+		return nil, fmt.Errorf(cErrorTxtTemplate, 1, cGetOutputDistribution, err)
+	}
+
+	resp := make(UniversalRequest)
+	if err := resp.FromPortableStorate(response); err != nil {
+		return nil, fmt.Errorf(cErrorTxtTemplate, 2, cGetOutputDistribution, err)
+	}
+
+	// if strings.ToLower(resp["status"].(string)) != "ok" {
+	// 	return nil, fmt.Errorf("error, request is not ok!")
+	// }
+
+	for key, val := range resp {
+		fmt.Println("key:", key)
+		_ = val
+	}
+
+	return nil, nil
 }

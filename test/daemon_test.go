@@ -29,7 +29,7 @@ func Test_DaemonRPC_GetTransactions(t *testing.T) {
 
 	resp, err := client.GetTransactions([]string{"5a0247682c4170b643150434198a04d73270b98dd4c112c852ee01efaec30c19"})
 	if err != nil {
-		t.Fatalf("GetBlocks returned error: %v", err)
+		t.Fatalf("GetTransactions returned error: %v", err)
 	}
 
 	if resp == nil {
@@ -42,4 +42,19 @@ func Test_DaemonRPC_GetTransactions(t *testing.T) {
 		fmt.Printf("BlockHeight: %d\n", uint64(tx["block_height"].(float64)))
 		fmt.Println("====")
 	}
+}
+
+func Test_DaemonRPC_GetOutputDistribution(t *testing.T) {
+	client := rpc.NewDaemonRPCClient()
+
+	resp, err := client.GetOutputDistribution(3557762)
+	if err != nil {
+		t.Fatalf("GetOutputDistribution returned error: %v", err)
+	}
+
+	if resp == nil {
+		t.Fatal("response is nil")
+	}
+
+	fmt.Println("Distribution:", resp)
 }

@@ -22,6 +22,8 @@ func (u UniversalRequest) MarshalToBlob() []byte {
 			sVal = levin.BoostUint64(v)
 		case []uint64:
 			sVal = levin.BoostUint64Array(v)
+		case bool:
+			sVal = levin.BoostBool(v)
 		default:
 			panic(fmt.Errorf("unsupported type for key %s: %T", key, val))
 		}
