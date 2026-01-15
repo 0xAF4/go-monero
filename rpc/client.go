@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -57,7 +58,7 @@ func (c *Client) GetBlocks(heights []uint64) ([]*types.Block, error) {
 	return blocksArr, nil
 }
 
-func (c *Client) GetTransactions(txIds []string) (*UniversalRequest, error) {
+func (c *Client) GetTransactions(txIds []string) (*[]UniversalRequest, error) {
 	req := UniversalRequest{
 		"txs_hashes":     txIds,
 		"decode_as_json": false,
@@ -71,5 +72,30 @@ func (c *Client) GetTransactions(txIds []string) (*UniversalRequest, error) {
 
 	resp := make(UniversalRequest)
 	resp.FromJson(response)
-	return
+
+	if strings.ToLower(resp["status"].(string)) != "ok" {
+		return nil, fmt.Errorf("error, request is not ok!")
+	}
+
+	var txs []UniversalRequest
+	for _, val := range resp["txs"].([]interface{}) {
+		vvv := val.(map[string]interface{})
+		data, _ := hex.DecodeString(vvv["as_hex"].(string))
+		hexTx := types.Transaction{
+			Raw: data,
+		}
+		hexTx.ParseTx()
+		hexTx.ParseRctSig()
+		hexTx.CalcHash()
+
+		tx := UniversalRequest{
+			"hash":           vvv["tx_hash"],
+			"output_indices": vvv["output_indices"],
+			"block_height":   vvv["block_height"],
+			"extra":          []byte(hexTx.Extra),
+		}
+		txs = append(txs, tx)
+	}
+
+	return &txs, nil
 }

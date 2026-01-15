@@ -48,13 +48,24 @@ func (u *UniversalRequest) FromPortableStorate(response []byte) error {
 	if err != nil {
 		return err
 	}
-
 	for _, val := range rStorage.Entries {
 		(*u)[val.Name] = val.Value
 	}
 	return nil
 }
 
-func (u *UniversalRequest) FromJson(js []byte) {
-	
+func (u *UniversalRequest) FromJson(js []byte) error {
+	// Сначала парсим в temporary map
+	var temp map[string]interface{}
+	if err := json.Unmarshal(js, &temp); err != nil {
+		return fmt.Errorf("failed to unmarshal json: %w", err)
+	}
+
+	// Конвертируем типы из JSON в нужные Go типы
+	*u = make(UniversalRequest)
+	for key, val := range temp {
+		(*u)[key] = (val)
+	}
+
+	return nil
 }
