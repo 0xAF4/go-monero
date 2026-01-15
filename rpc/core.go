@@ -49,7 +49,7 @@ func (c *Client) call(method string, data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
-
+	// fmt.Printf("response: %x\n", body) //TODO: need to remove
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("response status %d from %s, body: %s",
 			resp.StatusCode, url, string(body))

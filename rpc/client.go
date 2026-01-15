@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -105,11 +106,8 @@ func (c *Client) GetOutputDistribution(currentBlockHeight uint64) ([]uint64, err
 		"amounts":     []uint64{0},
 		"from_height": currentBlockHeight - 10,
 		"cumulative":  true,
-		"binary":      false,
-		"compress":    false,
 	}
 
-	// Для /get_blocks_by_height.bin используем JSON в запросе
 	response, err := c.cycleCall(cGetOutputDistribution, req.MarshalToBlob())
 	if err != nil {
 		return nil, fmt.Errorf(cErrorTxtTemplate, 1, cGetOutputDistribution, err)
@@ -120,14 +118,40 @@ func (c *Client) GetOutputDistribution(currentBlockHeight uint64) ([]uint64, err
 		return nil, fmt.Errorf(cErrorTxtTemplate, 2, cGetOutputDistribution, err)
 	}
 
-	// if strings.ToLower(resp["status"].(string)) != "ok" {
-	// 	return nil, fmt.Errorf("error, request is not ok!")
-	// }
-
-	for key, val := range resp {
-		fmt.Println("key:", key)
-		_ = val
+	if strings.ToLower(resp["status"].(string)) != "ok" {
+		return nil, fmt.Errorf("error, request is not ok!")
 	}
 
-	return nil, nil
+	var distributions []uint64
+	for _, distr := range resp["distributions"].(levin.Entries) {
+		for _, k1 := range distr.Entries() {
+			if k1.Name == "distribution" {
+				var bytes []byte
+				switch v := k1.Value.(type) {
+				case []byte:
+					bytes = v
+				case string:
+					bytes = []byte(v)
+				}
+
+				const UINT_SIZE = 8
+				if len(bytes)%UINT_SIZE != 0 {
+					return nil, fmt.Errorf("invalid distribution length: %d, expected multiple of %d", len(bytes), UINT_SIZE)
+				}
+
+				numHashes := len(bytes) / UINT_SIZE
+
+				for i := 0; i < numHashes; i++ {
+					start := i * UINT_SIZE
+					end := start + UINT_SIZE
+					obj := binary.LittleEndian.Uint64(bytes[start:end])
+					// Конвертируем в hex строку
+					distributions = append(distributions, obj)
+				}
+
+			}
+		}
+	}
+
+	return distributions, nil
 }
