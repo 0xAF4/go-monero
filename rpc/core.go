@@ -4,51 +4,49 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"time"
 )
 
 func getRandomDaemonNode() string {
-	rand.Seed(time.Now().UnixNano())
-	return cRPCDaemonNodes[rand.Intn(len(cRPCDaemonNodes))]
+	return cRPCDaemonNodes[rand.IntN(len(cRPCDaemonNodes))]
 }
 
 func (c *Client) cycleCall(method string, data []byte) ([]byte, error) {
 	var (
 		response []byte
-		try      int = 0
 		err      error
 	)
 
-	for try < cRetriesCount {
+	for try := 0; try < cRetriesCount; try++ {
 		response, err = c.call(method, data)
 		if err == nil {
-			break
+			return response, nil
 		}
+		time.Sleep(time.Millisecond * 100)
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
+	return nil, fmt.Errorf("failed after %d attempts: %w", cRetriesCount, err)
 }
 
 func (c *Client) call(method string, data []byte) ([]byte, error) {
-	resp, err := http.Post(getRandomDaemonNode()+method, "application/json", bytes.NewReader(data))
+	url := getRandomDaemonNode() + method
+
+	resp, err := http.Post(url, "application/json", bytes.NewReader(data))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("http post to %s failed: %w", url, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Response is %d, body: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("response status %d from %s, body: %s",
+			resp.StatusCode, url, string(body))
 	}
 
 	return body, nil

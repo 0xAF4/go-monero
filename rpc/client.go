@@ -21,11 +21,14 @@ func (c *Client) GetBlocks(heights []uint64) (*UniversalRequest, error) {
 		"heights": heights,
 	}
 
+	// Для /get_blocks_by_height.bin используем JSON в запросе
 	response, err := c.cycleCall(cGetBlocks, req.MarshalToBlob())
 	if err != nil {
 		return nil, fmt.Errorf(cErrorTxtTemplate, 1, cGetBlocks, err)
 	}
 
+	fmt.Printf("response: %x\n", response)
+	// Ответ приходит в бинарном формате (portable storage)
 	rStorage, err := levin.NewPortableStorageFromBytes(response)
 	if err != nil {
 		return nil, fmt.Errorf(cErrorTxtTemplate, 2, cGetBlocks, err)
@@ -38,7 +41,10 @@ func (c *Client) GetBlocks(heights []uint64) (*UniversalRequest, error) {
 }
 
 func (u UniversalRequest) MarshalToJson() []byte {
-	js, _ := json.Marshal(u)
+	js, err := json.Marshal(u)
+	if err != nil {
+		panic(fmt.Errorf("failed to marshal json: %w", err))
+	}
 	return js
 }
 
@@ -55,6 +61,8 @@ func (u UniversalRequest) MarshalToBlob() []byte {
 			sVal = levin.BoostUint64(v)
 		case []uint64:
 			sVal = levin.BoostTxIDs(v)
+		default:
+			panic(fmt.Errorf("unsupported type for key %s: %T", key, val))
 		}
 		entry := levin.Entry{
 			Name:         key,
