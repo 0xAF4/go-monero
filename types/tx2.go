@@ -133,8 +133,37 @@ func (t *Transaction) CalcOutputs() error {
 	return nil
 }
 
+func toInt(val interface{}) int {
+	switch n := val.(type) {
+	case uint:
+		return int(n)
+	case uint8:
+		return int(n)
+	case uint16:
+		return int(n)
+	case uint32:
+		return int(n)
+	case uint64:
+		return int(n)
+	case int:
+		return int(n)
+	case int8:
+		return int(n)
+	case int16:
+		return int(n)
+	case int32:
+		return int(n)
+	case int64:
+		return int(n)
+	case float64:
+		return int(n)
+	default:
+		panic("cant cast to int")
+	}
+}
+
 func (t *Transaction) writeInput2(rpcCli RPCClient, currentBlockHeight uint64, prm TxPrm) error {
-	vout := prm["vout"].(int)
+	vout := toInt(prm["vout"])
 	indx, err := getOutputIndex(rpcCli, prm["txId"].(string), vout)
 	if err != nil {
 		return fmt.Errorf("failed to get output index: %w", err)

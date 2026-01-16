@@ -164,7 +164,15 @@ func createBulletproofPlus(amounts []uint64, masks []*edwards25519.Scalar) (Bpp,
 	for j := 0; j < M; j++ {
 		for i := N - 1; i >= 0; i-- {
 			amountBytes := make([]byte, 8)
-			binary.LittleEndian.PutUint64(amountBytes, amounts[j])
+
+			// Если j >= len(amounts), используем 0
+			var amount uint64 = 0
+			if j < len(amounts) {
+				amount = amounts[j]
+			}
+
+			binary.LittleEndian.PutUint64(amountBytes, amount)
+
 			if j < len(amounts) && (amountBytes[i/8]&(1<<(i%8))) != 0 {
 				aL[j*N+i] = util.Identity
 				aL8[j*N+i] = util.INV_EIGHT
