@@ -11,8 +11,12 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/0xAF4/go-monero/rpc"
 )
 
 const (
@@ -111,6 +115,16 @@ func getOutputIndex(txId string, vout int) (uint64, error) {
 		return 0, fmt.Errorf("invalid output index value: %w", err)
 	}
 
+	fmt.Println(indexUint64)
+
+	client := rpc.NewDaemonRPCClient(5 * time.Second)
+	resp985, err := client.GetTransactions([]string{txId})
+	if err != nil {
+		return 0, fmt.Errorf("invalid output index value: %w", err)
+	}
+	fmt.Println(resp985)
+
+	os.Exit(1)
 	return uint64(indexUint64), nil
 }
 
