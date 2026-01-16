@@ -19,10 +19,12 @@ var cRPCDaemonNodes = []string{
 const (
 	cRetriesCount     = 3
 	cErrorTxtTemplate = "Error(%d) of calling %s method: %w"
+	cJSON_RPC         = "/json_rpc"
 
 	cGetBlocks             = "/get_blocks_by_height.bin"
 	cGetTransaction        = "/get_transactions"
-	cGetOutputDistribution = "/get_output_distribution.bin" //TODO: to-do
-	cGetOuts               = "/get_outs"                    //TODO: to-do
-	cSendRawTransaction    = "/send_raw_transaction"        //TODO: to-do
+	cGetOutputDistribution = "/get_output_distribution.bin"
+	cGetOuts               = "/get_outs"
+	cSendRawTransaction    = "/send_raw_transaction"
+	cGetFeeEstimate        = "get_fee_estimate"
 )

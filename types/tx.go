@@ -72,23 +72,6 @@ type RctSignature struct {
 	OutPk    []Hash `json:"outPk"`
 }
 
-type Bpp struct {
-	A  Hash   `json:"A"`
-	A1 Hash   `json:"A1"`
-	B  Hash   `json:"B"`
-	R1 Hash   `json:"r1"`
-	S1 Hash   `json:"s1"`
-	D1 Hash   `json:"d1"`
-	L  []Hash `json:"L"`
-	R  []Hash `json:"R"`
-}
-
-type CLSAG struct {
-	S  []Hash `json:"s"`
-	C1 Hash   `json:"c1"`
-	D  Hash   `json:"D"`
-}
-
 type RctSigPrunable struct {
 	Nbp        uint64  `json:"nbp"`
 	Bpp        []Bpp   `json:"bpp"`

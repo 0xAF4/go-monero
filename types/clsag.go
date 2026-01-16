@@ -8,6 +8,12 @@ import (
 	"github.com/0xAF4/go-monero/util"
 )
 
+type CLSAG struct {
+	S  []Hash `json:"s"`
+	C1 Hash   `json:"c1"`
+	D  Hash   `json:"D"`
+}
+
 func (t *Transaction) signCLSAGs() ([]CLSAG, error) {
 	CLSAGs := make([]CLSAG, len(t.Inputs))
 
@@ -229,10 +235,10 @@ func hashToScalar(keys []util.Key) util.Key {
 }
 
 func clsagPrepare(z util.Key, D *util.Key, H util.Key, a, aG, aH *util.Key) {
-	*D = util.ScalarMult(&z, &H)                                               // D = z * H_p(P[l])
+	*D = util.ScalarMult(&z, &H)                                          // D = z * H_p(P[l])
 	a.FromScalar(randomScalar())                                          // a = random scalar
 	aG.FromPoint(new(edwards25519.Point).ScalarBaseMult(a.KeyToScalar())) // aG = a * G
-	*aH = util.ScalarMult(a, &H)                                               // aH = a * H
+	*aH = util.ScalarMult(a, &H)                                          // aH = a * H
 }
 
 func clsagSign(c, a, p, z, mu_P, mu_C *util.Key, s *util.Key) {

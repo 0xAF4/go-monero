@@ -9,6 +9,17 @@ import (
 	"github.com/0xAF4/go-monero/util"
 )
 
+type Bpp struct {
+	A  Hash   `json:"A"`
+	A1 Hash   `json:"A1"`
+	B  Hash   `json:"B"`
+	R1 Hash   `json:"r1"`
+	S1 Hash   `json:"s1"`
+	D1 Hash   `json:"d1"`
+	L  []Hash `json:"L"`
+	R  []Hash `json:"R"`
+}
+
 type Exponent struct {
 	Transcript util.Key
 	MaxN       int

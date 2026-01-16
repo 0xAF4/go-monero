@@ -58,3 +58,42 @@ func Test_DaemonRPC_GetOutputDistribution(t *testing.T) {
 
 	fmt.Println("Distribution:", resp)
 }
+
+func Test_DaemonRPC_GetOuts(t *testing.T) { //TODO: to=do
+	client := rpc.NewDaemonRPCClient()
+
+	resp, err := client.GetOuts([]uint64{123456, 789012})
+	if err != nil {
+		t.Fatalf("GetOuts returned error: %v", err)
+	}
+
+	if resp == nil {
+		t.Fatal("response is nil")
+	}
+
+	for _, out := range resp {
+		fmt.Println(*out)
+	}
+}
+
+func Test_DaemonRPC_SendRawTransaction(t *testing.T) { //TODO: to=do
+	client := rpc.NewDaemonRPCClient()
+
+	ok, err := client.SendRawTransaction("txHex")
+	if err != nil {
+		t.Fatalf("SendRawTransaction returned error: %v", err)
+	}
+
+	fmt.Println("Sended:", *ok)
+}
+
+func Test_DaemonRPC_GetFeeEstimate(t *testing.T) { //TODO: to=do
+	client := rpc.NewDaemonRPCClient()
+
+	fees, err := client.GetFeeEstimate()
+	if err != nil {
+		t.Fatalf("GetOutputDistribution returned error: %v", err)
+	}
+
+	fmt.Println("Fees:", *fees)
+}

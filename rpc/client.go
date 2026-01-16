@@ -155,3 +155,102 @@ func (c *Client) GetOutputDistribution(currentBlockHeight uint64) ([]uint64, err
 
 	return distributions, nil
 }
+
+func (c *Client) GetOuts(indxs []uint64) ([]*UniversalRequest, error) {
+	outs := []*UniversalRequest{}
+	for _, val := range indxs {
+		outs = append(outs, &UniversalRequest{
+			"amount": 0,
+			"index":  val,
+		})
+	}
+
+	req := UniversalRequest{
+		"outputs": outs,
+	}
+
+	response, err := c.cycleCall(cGetOuts, req.MarshalToJson())
+	if err != nil {
+		return nil, fmt.Errorf(cErrorTxtTemplate, 1, cGetOuts, err)
+	}
+
+	resp := make(UniversalRequest)
+	resp.FromJson(response)
+
+	if strings.ToLower(resp["status"].(string)) != "ok" {
+		return nil, fmt.Errorf("error, request is not ok!")
+	}
+
+	arr := resp["outs"].([]interface{})
+	for i, val := range outs {
+		t := arr[i].(map[string]interface{})
+		(*val)["key"] = t["key"]
+		(*val)["mask"] = t["mask"]
+	}
+
+	return outs, nil
+}
+
+func (c *Client) SendRawTransaction(inHex string) (*bool, error) {
+	req := UniversalRequest{
+		"tx_as_hex":    inHex,
+		"do_not_relay": false,
+	}
+
+	response, err := c.cycleCall(cSendRawTransaction, req.MarshalToJson())
+	if err != nil {
+		return nil, fmt.Errorf(cErrorTxtTemplate, 1, cGetOuts, err)
+	}
+
+	resp := make(UniversalRequest)
+	resp.FromJson(response)
+
+	if strings.ToLower(resp["status"].(string)) != "ok" {
+		return nil, fmt.Errorf("error, request is not ok!")
+	}
+
+	r := true
+	return &r, nil
+}
+
+func toUint64(v interface{}) (uint64, bool) {
+	switch n := v.(type) {
+	case uint64:
+		return n, true
+	case int:
+		return uint64(n), true
+	case int64:
+		return uint64(n), true
+	case float64:
+		return uint64(n), true
+	default:
+		return 0, false
+	}
+}
+
+func (c *Client) GetFeeEstimate() (*[]uint64, error) {
+	template := `{"jsonrpc":"2.0","method":"%s","params":{},"id":"0"}`
+	reqBody := []byte(fmt.Sprintf(template, cGetFeeEstimate))
+
+	response, err := c.cycleCall(cJSON_RPC, reqBody)
+	if err != nil {
+		return nil, fmt.Errorf(cErrorTxtTemplate, 1, cGetFeeEstimate, err)
+	}
+
+	resp := make(UniversalRequest)
+	resp.FromJson(response)
+	result := resp["result"].(map[string]interface{})
+
+	if strings.ToLower(result["status"].(string)) != "ok" {
+		return nil, fmt.Errorf("error, request is not ok!")
+	}
+
+	fees := []uint64{}
+	for _, fee := range result["fees"].([]interface{}) {
+		if v, ok := toUint64(fee); ok {
+			fees = append(fees, v)
+		}
+	}
+
+	return &fees, nil
+}
