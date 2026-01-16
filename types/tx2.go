@@ -13,25 +13,6 @@ import (
 
 type TxPrm map[string]interface{}
 
-var mockOffset = []uint64{
-	143369868,
-	506667,
-	605704,
-	69702,
-	405731,
-	275890,
-	249503,
-	38215,
-	86866,
-	1588,
-	17,
-	266,
-	1281,
-	231,
-	223,
-	1401,
-}
-
 const (
 	txPrivateKeyHex = "fc1415ced071ae7de346a7ca0dd2b0f9b64cd64423d5ea73b971da135c54de05"
 )
@@ -177,7 +158,6 @@ func (t *Transaction) writeInput2(rpcCli RPCClient, currentBlockHeight uint64, p
 	if err != nil {
 		return fmt.Errorf("failed to build key offsets: %w", err)
 	}
-	keyOffset = mockOffset
 
 	mixins, OrderIndx, err := GetMixins(rpcCli, keyOffset, indx)
 	if err != nil {
