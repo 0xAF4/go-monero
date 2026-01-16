@@ -38,6 +38,9 @@ func Test_DaemonRPC_GetTransactions(t *testing.T) {
 	if resp == nil {
 		t.Fatal("response is nil")
 	}
+	extra := (*resp)[0]["extra"]
+	fmt.Println(extra)
+	fmt.Printf("extra: %x\n", extra)
 
 	for _, tx := range *resp {
 		fmt.Printf("TxHash: %s\n", tx["hash"])
@@ -79,7 +82,7 @@ func Test_DaemonRPC_GetOuts(t *testing.T) { //TODO: to=do
 	}
 }
 
-func Test_DaemonRPC_SendRawTransaction(t *testing.T) { //TODO: to=do
+func Test_DaemonRPC_SendRawTransaction(t *testing.T) {
 	client := rpc.NewDaemonRPCClient(timeout)
 
 	ok, err := client.SendRawTransaction("txHex")
@@ -90,7 +93,7 @@ func Test_DaemonRPC_SendRawTransaction(t *testing.T) { //TODO: to=do
 	fmt.Println("Sended:", *ok)
 }
 
-func Test_DaemonRPC_GetFeeEstimate(t *testing.T) { //TODO: to=do
+func Test_DaemonRPC_GetFeeEstimate(t *testing.T) {
 	client := rpc.NewDaemonRPCClient(timeout)
 
 	fees, err := client.GetFeeEstimate()
@@ -99,4 +102,16 @@ func Test_DaemonRPC_GetFeeEstimate(t *testing.T) { //TODO: to=do
 	}
 
 	fmt.Println("Fees:", *fees)
+}
+
+func Test_DaemonRPC_GetHeight(t *testing.T) {
+	client := rpc.NewDaemonRPCClient(timeout)
+
+	hash, height, err := client.GetHeight()
+	if err != nil {
+		t.Fatalf("GetHeight returned error: %v", err)
+	}
+
+	fmt.Println("hash:", hash)
+	fmt.Println("height:", height)
 }

@@ -26,5 +26,6 @@ const (
 	cGetOutputDistribution = "/get_output_distribution.bin"
 	cGetOuts               = "/get_outs"
 	cSendRawTransaction    = "/send_raw_transaction"
+	cGetHeight             = "/get_height"
 	cGetFeeEstimate        = "get_fee_estimate"
 )

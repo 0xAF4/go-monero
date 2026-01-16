@@ -263,3 +263,19 @@ func (c *Client) GetFeeEstimate() (*[]uint64, error) {
 
 	return &fees, nil
 }
+
+func (c *Client) GetHeight() (string, uint64, error) {
+	response, err := c.cycleCall(cGetHeight, nil)
+	if err != nil {
+		return "", 0, fmt.Errorf(cErrorTxtTemplate, 1, cGetHeight, err)
+	}
+
+	resp := make(UniversalRequest)
+	resp.FromJson(response)
+
+	if strings.ToLower(resp["status"].(string)) != "ok" {
+		return "", 0, fmt.Errorf("error, request is not ok!")
+	}
+	val, _ := toUint64(resp["height"])
+	return resp["hash"].(string), val, nil
+}
