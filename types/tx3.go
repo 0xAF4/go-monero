@@ -1,22 +1,12 @@
 package types
 
 import (
-	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"log"
 	"math"
 	"math/rand"
-	"net/http"
-	"os"
 	"sort"
-	"strings"
-	"time"
-
-	"github.com/0xAF4/go-monero/rpc"
 )
 
 const (
@@ -67,65 +57,18 @@ func sampleOutputAgeDays(r *rand.Rand) float64 {
 	return age
 }
 
-func getOutputIndex(txId string, vout int) (uint64, error) {
+func getOutputIndex(rpcClient RPCClient, txId string, vout int) (uint64, error) {
 	if vout < 0 {
 		return 0, fmt.Errorf("vout must be non-negative")
 	}
 
-	body := fmt.Sprintf(`{"txs_hashes":["%s"],"decode_as_json":false}`, txId)
-
-	resp, err := http.Post(daemonURL, "application/json", strings.NewReader(body))
-	if err != nil {
-		return 0, fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("daemon returned status %s", resp.Status)
-	}
-
-	// Структура ответа
-	type txResponse struct {
-		Txs []struct {
-			OutputIndices []json.Number `json:"output_indices"`
-		} `json:"txs"`
-	}
-
-	var result txResponse
-
-	decoder := json.NewDecoder(resp.Body)
-	decoder.UseNumber()
-
-	if err := decoder.Decode(&result); err != nil {
-		return 0, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	if len(result.Txs) == 0 {
-		return 0, fmt.Errorf("no transactions found in response")
-	}
-
-	outputs := result.Txs[0].OutputIndices
-
-	if vout >= len(outputs) {
-		return 0, fmt.Errorf("vout index out of range")
-	}
-
-	indexUint64, err := outputs[vout].Int64()
+	resp985, err := rpcClient.GetTransactions([]string{txId})
 	if err != nil {
 		return 0, fmt.Errorf("invalid output index value: %w", err)
 	}
 
-	fmt.Println(indexUint64)
-
-	client := rpc.NewDaemonRPCClient(5 * time.Second)
-	resp985, err := client.GetTransactions([]string{txId})
-	if err != nil {
-		return 0, fmt.Errorf("invalid output index value: %w", err)
-	}
-	fmt.Println(resp985)
-
-	os.Exit(1)
-	return uint64(indexUint64), nil
+	indexUint64 := (*resp985)[0]["output_indices"].([]uint64)[vout]
+	return indexUint64, nil
 }
 
 func BuildKeyOffsets(indices []uint64) ([]uint64, error) {
@@ -158,103 +101,19 @@ func BuildKeyOffsets(indices []uint64) ([]uint64, error) {
 	return offsets, nil
 }
 
-func getMaxGlobalIndex() (uint64, error) {
-	req := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      "0",
-		"method":  "get_output_distribution",
-		"params": map[string]interface{}{
-			"amounts":     []uint64{0},
-			"from_height": currentBlockHeight - 10,
-			"cumulative":  true,
-			"binary":      false,
-			"compress":    false,
-		},
-	}
-
-	var resp struct {
-		Result struct {
-			Distributions []struct {
-				Distribution []uint64 `json:"distribution"`
-			} `json:"distributions"`
-		} `json:"result"`
-	}
-
-	if err := call(req, &resp); err != nil {
+func getMaxGlobalIndex(rpcClient RPCClient, currentBlockHeight uint64) (uint64, error) {
+	distrib, err := rpcClient.GetOutputDistribution(currentBlockHeight)
+	if err != nil {
 		return 0, err
 	}
 
-	dist := resp.Result.Distributions[0].Distribution
-	return dist[len(dist)-1] - 1, nil
+	return distrib[len(distrib)-1] - 1, nil
 }
 
-func call(reqBody any, respBody any) error {
-	data, err := json.Marshal(reqBody)
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("POST", "https://xmr3.doggett.tech:18089/json_rpc", bytes.NewReader(data))
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf(
-			"daemon rpc http %d: %s",
-			resp.StatusCode,
-			string(body),
-		)
-	}
-
-	return json.NewDecoder(resp.Body).Decode(respBody)
-}
-
-type getOut struct {
-	Amount uint64 `json:"amount"`
-	Index  uint64 `json:"index"`
-}
-
-// структура запроса
-type getOutsReq struct {
-	Outputs []getOut `json:"outputs"`
-}
-
-type GetOutsResp struct {
-	Credits   uint64 `json:"credits"`
-	Outs      []Out  `json:"outs"`
-	Status    string `json:"status"`
-	TopHash   string `json:"top_hash"`
-	Untrusted bool   `json:"untrusted"`
-}
-
-type Out struct {
-	Height   uint64 `json:"height"`
-	Key      string `json:"key"`
-	Mask     string `json:"mask"`
-	Txid     string `json:"txid"`
-	Unlocked bool   `json:"unlocked"`
-}
-
-func GetMixins(keyOffsets []uint64, inputIndx uint64) (*[]Mixin, *int, error) {
+func GetMixins(rpcClient RPCClient, keyOffsets []uint64, inputIndx uint64) (*[]Mixin, *int, error) {
 	indxs := append([]uint64(nil), keyOffsets...)
 	for i := 1; i < len(indxs); i++ {
 		indxs[i] = indxs[i] + indxs[i-1]
-	}
-
-	reqd := getOutsReq{
-		Outputs: make([]getOut, 0, len(indxs)),
 	}
 
 	// заполняем outputs
@@ -263,52 +122,18 @@ func GetMixins(keyOffsets []uint64, inputIndx uint64) (*[]Mixin, *int, error) {
 		if idx == inputIndx {
 			OrderIndx = i
 		}
-		reqd.Outputs = append(reqd.Outputs, getOut{
-			Amount: 0, // RingCT → всегда 0
-			Index:  uint64(idx),
-		})
 	}
 
-	data, err := json.Marshal(reqd)
+	dests, err := rpcClient.GetOuts(indxs)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	// req, err := http.NewRequest("POST", "https://xmr.unshakled.net:443/get_outs", bytes.NewReader(data))
-	req, err := http.NewRequest("POST", "https://xmr3.doggett.tech:18089/get_outs", bytes.NewReader(data))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, nil, fmt.Errorf(
-			"daemon rpc http %d: %s",
-			resp.StatusCode,
-			string(body),
-		)
-	}
-
-	var respS GetOutsResp
-	body, _ := io.ReadAll(resp.Body)
-	if err := json.Unmarshal(body, &respS); err != nil {
-		log.Fatal(err)
 	}
 
 	mixins := new([]Mixin)
-	for _, out := range respS.Outs {
-		dest, _ := hex.DecodeString(out.Key)
-		mask, _ := hex.DecodeString(out.Mask)
+	for _, out := range dests {
+		tout := *out
+		dest, _ := hex.DecodeString(tout["key"].(string))
+		mask, _ := hex.DecodeString(tout["mask"].(string))
 
 		*mixins = append(*mixins, Mixin{
 			Dest: Hash(dest),

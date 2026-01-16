@@ -13,9 +13,6 @@ import (
 
 type TxPrm map[string]interface{}
 
-const daemonURL = "https://xmr3.doggett.tech:18089/get_transactions"
-const currentBlockHeight = 3570154
-
 var mockOffset = []uint64{
 	143369868,
 	506667,
@@ -141,9 +138,9 @@ func (t *Transaction) CalcExtra() error {
 	return nil
 }
 
-func (t *Transaction) CalcInputs() error {
+func (t *Transaction) CalcInputs(rpcCli RPCClient, currentBlockHeight uint64) error {
 	for _, val := range t.PInputs {
-		if err := t.writeInput2(val); err != nil {
+		if err := t.writeInput2(rpcCli, currentBlockHeight, val); err != nil {
 			return err
 		}
 	}
@@ -159,14 +156,14 @@ func (t *Transaction) CalcOutputs() error {
 	return nil
 }
 
-func (t *Transaction) writeInput2(prm TxPrm) error {
+func (t *Transaction) writeInput2(rpcCli RPCClient, currentBlockHeight uint64, prm TxPrm) error {
 	vout := prm["vout"].(int)
-	indx, err := getOutputIndex(prm["txId"].(string), vout)
+	indx, err := getOutputIndex(rpcCli, prm["txId"].(string), vout)
 	if err != nil {
 		return fmt.Errorf("failed to get output index: %w", err)
 	}
 
-	maxIndx, err := getMaxGlobalIndex()
+	maxIndx, err := getMaxGlobalIndex(rpcCli, currentBlockHeight)
 	if err != nil {
 		return fmt.Errorf("failed to get max global index: %w", err)
 	}
@@ -182,7 +179,7 @@ func (t *Transaction) writeInput2(prm TxPrm) error {
 	}
 	keyOffset = mockOffset
 
-	mixins, OrderIndx, err := GetMixins(keyOffset, indx)
+	mixins, OrderIndx, err := GetMixins(rpcCli, keyOffset, indx)
 	if err != nil {
 		return fmt.Errorf("Get Mixins Error: %w", err)
 	}

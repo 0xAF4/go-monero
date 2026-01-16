@@ -64,7 +64,7 @@ func (c *Client) GetBlocks(heights []uint64) ([]*types.Block, error) {
 	return blocksArr, nil
 }
 
-func (c *Client) GetTransactions(txIds []string) (*[]UniversalRequest, error) {
+func (c *Client) GetTransactions(txIds []string) (*[]map[string]interface{}, error) {
 	req := UniversalRequest{
 		"txs_hashes":     txIds,
 		"decode_as_json": false,
@@ -83,7 +83,7 @@ func (c *Client) GetTransactions(txIds []string) (*[]UniversalRequest, error) {
 		return nil, fmt.Errorf("error, request is not ok!")
 	}
 
-	var txs []UniversalRequest
+	var txs []map[string]interface{}
 	for _, val := range resp["txs"].([]interface{}) {
 		vvv := val.(map[string]interface{})
 		data, _ := hex.DecodeString(vvv["as_hex"].(string))
@@ -94,9 +94,15 @@ func (c *Client) GetTransactions(txIds []string) (*[]UniversalRequest, error) {
 		hexTx.ParseRctSig()
 		hexTx.CalcHash()
 
-		tx := UniversalRequest{
+		v64arr := []uint64{}
+		for _, val := range vvv["output_indices"].([]interface{}) {
+			v64, _ := toUint64(val)
+			v64arr = append(v64arr, v64)
+		}
+
+		tx := map[string]interface{}{
 			"hash":           vvv["tx_hash"],
-			"output_indices": vvv["output_indices"],
+			"output_indices": v64arr,
 			"block_height":   vvv["block_height"],
 			"extra":          []byte(hexTx.Extra),
 		}
@@ -161,10 +167,10 @@ func (c *Client) GetOutputDistribution(currentBlockHeight uint64) ([]uint64, err
 	return distributions, nil
 }
 
-func (c *Client) GetOuts(indxs []uint64) ([]*UniversalRequest, error) {
-	outs := []*UniversalRequest{}
+func (c *Client) GetOuts(indxs []uint64) ([]*map[string]interface{}, error) {
+	outs := []*map[string]interface{}{}
 	for _, val := range indxs {
-		outs = append(outs, &UniversalRequest{
+		outs = append(outs, &map[string]interface{}{
 			"amount": 0,
 			"index":  val,
 		})
