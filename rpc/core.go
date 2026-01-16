@@ -39,7 +39,11 @@ func (c *Client) call(method string, data []byte) ([]byte, error) {
 		contentType = "application/octet-stream"
 	}
 
-	resp, err := http.Post(url, contentType, bytes.NewReader(data))
+	httpClient := &http.Client{
+		Timeout: c.timeout,
+	}
+
+	resp, err := httpClient.Post(url, contentType, bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("http post to %s failed: %w", url, err)
 	}
@@ -49,10 +53,12 @@ func (c *Client) call(method string, data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
-	// fmt.Printf("response: %x\n", body) //TODO: need to remove
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("response status %d from %s, body: %s",
-			resp.StatusCode, url, string(body))
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf(
+			"response status %d from %s, body: %s",
+			resp.StatusCode, url, string(body),
+		)
 	}
 
 	return body, nil

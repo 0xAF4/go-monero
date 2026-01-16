@@ -5,15 +5,20 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/0xAF4/go-monero/levin"
 	"github.com/0xAF4/go-monero/types"
 )
 
-type Client struct{}
+type Client struct {
+	timeout time.Duration
+}
 
-func NewDaemonRPCClient() *Client {
-	return &Client{}
+func NewDaemonRPCClient(tout time.Duration) *Client {
+	return &Client{
+		timeout: tout,
+	}
 }
 
 func (c *Client) GetBlocks(heights []uint64) ([]*types.Block, error) {
