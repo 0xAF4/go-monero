@@ -3,12 +3,15 @@ package test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/0xAF4/go-monero/rpc"
 )
 
+const timeout = 10 * time.Second
+
 func Test_DaemonRPC_GetBlocks(t *testing.T) {
-	client := rpc.NewDaemonRPCClient()
+	client := rpc.NewDaemonRPCClient(timeout)
 
 	resp, err := client.GetBlocks([]uint64{3517762, 3527762, 3537762, 3547762, 3557762})
 	if err != nil {
@@ -25,7 +28,7 @@ func Test_DaemonRPC_GetBlocks(t *testing.T) {
 }
 
 func Test_DaemonRPC_GetTransactions(t *testing.T) {
-	client := rpc.NewDaemonRPCClient()
+	client := rpc.NewDaemonRPCClient(timeout)
 
 	resp, err := client.GetTransactions([]string{"5a0247682c4170b643150434198a04d73270b98dd4c112c852ee01efaec30c19"})
 	if err != nil {
@@ -45,7 +48,7 @@ func Test_DaemonRPC_GetTransactions(t *testing.T) {
 }
 
 func Test_DaemonRPC_GetOutputDistribution(t *testing.T) {
-	client := rpc.NewDaemonRPCClient()
+	client := rpc.NewDaemonRPCClient(timeout)
 
 	resp, err := client.GetOutputDistribution(3557762)
 	if err != nil {
@@ -60,7 +63,7 @@ func Test_DaemonRPC_GetOutputDistribution(t *testing.T) {
 }
 
 func Test_DaemonRPC_GetOuts(t *testing.T) { //TODO: to=do
-	client := rpc.NewDaemonRPCClient()
+	client := rpc.NewDaemonRPCClient(timeout)
 
 	resp, err := client.GetOuts([]uint64{123456, 789012})
 	if err != nil {
@@ -77,7 +80,7 @@ func Test_DaemonRPC_GetOuts(t *testing.T) { //TODO: to=do
 }
 
 func Test_DaemonRPC_SendRawTransaction(t *testing.T) { //TODO: to=do
-	client := rpc.NewDaemonRPCClient()
+	client := rpc.NewDaemonRPCClient(timeout)
 
 	ok, err := client.SendRawTransaction("txHex")
 	if err != nil {
@@ -88,7 +91,7 @@ func Test_DaemonRPC_SendRawTransaction(t *testing.T) { //TODO: to=do
 }
 
 func Test_DaemonRPC_GetFeeEstimate(t *testing.T) { //TODO: to=do
-	client := rpc.NewDaemonRPCClient()
+	client := rpc.NewDaemonRPCClient(timeout)
 
 	fees, err := client.GetFeeEstimate()
 	if err != nil {
