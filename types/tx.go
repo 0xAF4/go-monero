@@ -225,6 +225,7 @@ func (tx *Transaction) ParseRctSig() {
 
 	rest := make([]byte, reader.Len())
 	reader.Read(rest)
+	tx.RctRaw = rest
 }
 
 func (tx *Transaction) CheckOutputs(address string, privateViewKey string) (float64, uint64, error) {

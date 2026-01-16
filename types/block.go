@@ -100,8 +100,13 @@ func (block *Block) FullfillBlockHeader() error {
 	//----
 	block.TxsCount, _ = levin.ReadVarint(reader)
 	for i := 0; i <= int(block.TxsCount)-1; i++ {
+		var raw []byte
+		if i < len(block.tx) {
+			raw = block.tx[i]
+		}
+
 		tx := &Transaction{
-			Raw: block.tx[i],
+			Raw: raw,
 		}
 		reader.Read(tx.Hash[:])
 		block.TXs = append(block.TXs, tx)
