@@ -276,7 +276,7 @@ func (t *Transaction) writeOutput2(prm TxPrm) error {
 	return nil
 }
 
-func (t *Transaction) SignTransaction(tx1 Transaction) error {
+func (t *Transaction) SignTransaction() error {
 	Bpp, err := t.signBpp()
 	if err != nil {
 		return fmt.Errorf("failed to sign bpp: %w", err)
