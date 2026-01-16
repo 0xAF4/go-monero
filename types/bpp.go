@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math/rand"
 
 	"filippo.io/edwards25519"
 	"github.com/0xAF4/go-monero/util"
@@ -672,8 +673,8 @@ func (t *Transaction) calculatePseudoOuts() ([]Hash, error) {
 // randomScalar генерирует криптографически стойкий случайный скаляр
 func randomScalar() *edwards25519.Scalar {
 	var buf [64]byte
-	binary.LittleEndian.PutUint64(buf[:8], 1) //
-	// rand.Read(buf[:])
+	// binary.LittleEndian.PutUint64(buf[:8], 1) //
+	rand.Read(buf[:])
 	scalar := new(edwards25519.Scalar)
 	scalar.SetUniformBytes(buf[:])
 	return scalar

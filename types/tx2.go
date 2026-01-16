@@ -13,10 +13,6 @@ import (
 
 type TxPrm map[string]interface{}
 
-const (
-	txPrivateKeyHex = "fc1415ced071ae7de346a7ca0dd2b0f9b64cd64423d5ea73b971da135c54de05"
-)
-
 func NewEmptyTransaction() *Transaction {
 	// var err error
 	tx := &Transaction{
@@ -37,10 +33,10 @@ func NewEmptyTransaction() *Transaction {
 		},
 	}
 
-	// tx.SecretKey = RandomScalar().ToBytes()
-	if h, err := util.HexTo32(txPrivateKeyHex); err == nil {
-		tx.SecretKey = Hash(h)
-	}
+	tx.SecretKey = util.RandomScalar().ToBytes()
+	// if h, err := util.HexTo32("fc1415ced071ae7de346a7ca0dd2b0f9b64cd64423d5ea73b971da135c54de05"); err == nil {
+	// 	tx.SecretKey = Hash(h)
+	// }
 
 	return tx
 }

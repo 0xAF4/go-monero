@@ -91,8 +91,6 @@ func (c *Client) GetTransactions(txIds []string) (*[]map[string]interface{}, err
 			Raw: data,
 		}
 		hexTx.ParseTx()
-		hexTx.ParseRctSig()
-		hexTx.CalcHash()
 
 		v64arr := []uint64{}
 		for _, val := range vvv["output_indices"].([]interface{}) {
