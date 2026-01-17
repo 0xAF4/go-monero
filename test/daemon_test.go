@@ -85,7 +85,7 @@ func Test_DaemonRPC_GetOuts(t *testing.T) { //TODO: to=do
 func Test_DaemonRPC_SendRawTransaction(t *testing.T) {
 	client := rpc.NewDaemonRPCClient(timeout)
 
-	ok, err := client.SendRawTransaction("txHex")
+	ok, err := client.SendRawTransaction("txHex", false)
 	if err != nil {
 		t.Fatalf("SendRawTransaction returned error: %v", err)
 	}

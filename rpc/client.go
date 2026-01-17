@@ -199,10 +199,10 @@ func (c *Client) GetOuts(indxs []uint64) ([]*map[string]interface{}, error) {
 	return outs, nil
 }
 
-func (c *Client) SendRawTransaction(inHex string) (*map[string]interface{}, error) {
+func (c *Client) SendRawTransaction(inHex string, do_not_relay bool) (*map[string]interface{}, error) {
 	req := UniversalRequest{
 		"tx_as_hex":    inHex,
-		"do_not_relay": false,
+		"do_not_relay": do_not_relay,
 	}
 
 	response, err := c.cycleCall(cSendRawTransaction, req.MarshalToJson())
