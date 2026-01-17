@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"math/rand"
 
 	"filippo.io/edwards25519"
 	"github.com/0xAF4/go-monero/util"
@@ -198,7 +197,7 @@ func createBulletproofPlus(amounts []uint64, masks []*edwards25519.Scalar) (Bpp,
 	bpp := Bpp{}
 
 	// Генерируем криптографически стойкие случайные скаляры
-	alpha := randomScalar()
+	alpha := util.RandomScalar().KeyToScalar()
 
 	bpp.A = computeA(alpha, aL8, aR8, *exponent)
 
@@ -265,10 +264,7 @@ func createBulletproofPlus(amounts []uint64, masks []*edwards25519.Scalar) (Bpp,
 
 		// Генерируем случайные dL и dR
 		dL := util.RandomScalar()
-		dL.FromScalar(randomScalar())
-
 		dR := util.RandomScalar()
-		dR.FromScalar(randomScalar())
 
 		// Вычисляем L[round] и R[round]
 		L[round] = computeLR(nprime, yinvpow[nprime], &Gprime, nprime, &Hprime, 0, aprime, 0, bprime, nprime, cL, *dL)
@@ -325,13 +321,9 @@ func createBulletproofPlus(amounts []uint64, masks []*edwards25519.Scalar) (Bpp,
 	}
 
 	r := util.RandomScalar()
-	r.FromScalar(randomScalar())
 	s := util.RandomScalar()
-	s.FromScalar(randomScalar())
 	d_ := util.RandomScalar()
-	d_.FromScalar(randomScalar())
 	eta := util.RandomScalar()
-	eta.FromScalar(randomScalar())
 
 	// Подготовка данных для A1
 	A1Data := make([]MultiexpData, 4)
@@ -676,14 +668,4 @@ func (t *Transaction) calculatePseudoOuts() ([]Hash, error) {
 	pseudoOuts[lastI] = Hash(pseudoOut)
 
 	return pseudoOuts, nil
-}
-
-// randomScalar генерирует криптографически стойкий случайный скаляр
-func randomScalar() *edwards25519.Scalar {
-	var buf [64]byte
-	// binary.LittleEndian.PutUint64(buf[:8], 1) //
-	rand.Read(buf[:])
-	scalar := new(edwards25519.Scalar)
-	scalar.SetUniformBytes(buf[:])
-	return scalar
 }

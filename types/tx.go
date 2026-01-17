@@ -547,28 +547,13 @@ func DecodeRctAmount(txPubKey []byte, privateViewKey []byte, outputIndex uint64,
 // decodeRctAmount decodes an encrypted RCT amount
 // generateBulletproofPlusMask генерирует commitment mask для BP+ входа
 func generateBulletproofPlusMask(txPubKey []byte, privateViewKey []byte, outputIndex uint64) (Hash, error) {
-
-	// 1. Вычисляем derivation (8*a*R)
-	Rpt, err := new(edwards25519.Point).SetBytes(txPubKey)
+	sharedsecret, err := util.SharedSecret(txPubKey, privateViewKey)
 	if err != nil {
-		return Hash{}, fmt.Errorf("invalid tx public key: %w", err)
+		return Hash{}, fmt.Errorf("Error of creating sharedsecret: %w", err)
 	}
-
-	a := new(edwards25519.Scalar)
-	if _, err := a.SetCanonicalBytes(privateViewKey); err != nil {
-		return Hash{}, fmt.Errorf("invalid private view key: %w", err)
-	}
-
-	eight := new(edwards25519.Scalar)
-	eightBytes := [32]byte{8}
-	eight.SetCanonicalBytes(eightBytes[:])
-
-	eightA := new(edwards25519.Scalar).Multiply(eight, a)
-	derivation := new(edwards25519.Point).ScalarMult(eightA, Rpt)
-	derivationBytes := derivation.Bytes()
 
 	// 2. Вычисляем Hs(8aR || outputIndex)
-	hashInput := append(derivationBytes, util.EncodeVarint(outputIndex)...)
+	hashInput := append(sharedsecret, util.EncodeVarint(outputIndex)...)
 	derivationHash := util.Keccak256(hashInput)
 
 	// 3. Reduce mod l
@@ -648,36 +633,10 @@ func CalcOutPk(amount float64, pubViewKey []byte, pubSpendKey []byte, txSecretKe
 	// Convert amount to atomic units
 	amountAtomic := util.XmrToAtomic(amount, 1e12)
 
-	// ВАЖНО: Сначала вычисляем shared secret правильно
-	// В Monero: shared_secret = r * A (где r - tx secret key, A - pub view key)
-	// НО для Edwards25519 нужно умножить на 8 (cofactor)
-
-	// Parse recipient's public view key
-	pubViewPoint, err := new(edwards25519.Point).SetBytes(pubViewKey)
+	sharedSecret, err := util.SharedSecret(pubViewKey, txSecretKey)
 	if err != nil {
-		return nil, Hash{}, fmt.Errorf("invalid public view key: %w", err)
+		return nil, Hash{}, fmt.Errorf("failed to calc sharedsecret: %w", err)
 	}
-
-	// Parse tx secret key as scalar
-	txSecScalar := new(edwards25519.Scalar)
-	if _, err := txSecScalar.SetCanonicalBytes(txSecretKey); err != nil {
-		return nil, Hash{}, fmt.Errorf("invalid tx secret key: %w", err)
-	}
-
-	// Create scalar 8 (cofactor)
-	eightBytes := make([]byte, 32)
-	eightBytes[0] = 8
-	eight := new(edwards25519.Scalar)
-	if _, err := eight.SetCanonicalBytes(eightBytes); err != nil {
-		return nil, Hash{}, fmt.Errorf("failed to create scalar 8: %w", err)
-	}
-
-	// Compute 8 * r
-	eightR := new(edwards25519.Scalar).Multiply(eight, txSecScalar)
-
-	// Compute shared secret point: (8*r) * A
-	sharedPoint := new(edwards25519.Point).ScalarMult(eightR, pubViewPoint)
-	sharedSecret := sharedPoint.Bytes()
 
 	// Compute Hs(shared_secret || index) - derivation scalar
 	hashInput := append(sharedSecret, util.EncodeVarint(outputIndex)...)
@@ -704,30 +663,12 @@ func CalcOutPk(amount float64, pubViewKey []byte, pubSpendKey []byte, txSecretKe
 		return nil, Hash{}, fmt.Errorf("failed to derive blinding factor: %w", err)
 	}
 
-	// Create scalar from amount (little-endian)
-	amountBytes := make([]byte, 32)
-	binary.LittleEndian.PutUint64(amountBytes, amountAtomic)
-	amountScalar := new(edwards25519.Scalar)
-	if _, err := amountScalar.SetCanonicalBytes(amountBytes); err != nil {
-		return nil, Hash{}, fmt.Errorf("failed to create amount scalar: %w", err)
+	commitment, err := CalcCommitment(amountAtomic, [32]byte(blindingFactor.Bytes()))
+	if err != nil {
+		return nil, Hash{}, fmt.Errorf("CalcCommitment error: %w", err)
 	}
 
-	// Get H (second base point)
-	H := getH()
-
-	// Compute Pedersen commitment: C = xG + aH
-	// где x - blinding factor (mask), a - amount
-
-	// xG = blinding_factor * G
-	xG := new(edwards25519.Point).ScalarBaseMult(blindingFactor)
-
-	// aH = amount * H
-	aH := new(edwards25519.Point).ScalarMult(amountScalar, H)
-
-	// C = xG + aH
-	commitment := new(edwards25519.Point).Add(xG, aH)
-
-	return blindingFactor, Hash(commitment.Bytes()), nil
+	return blindingFactor, commitment, nil
 }
 
 func CalcCommitment(amount uint64, mask [32]byte) (Hash, error) {

@@ -176,7 +176,7 @@ func (t *Transaction) writeInput2(rpcCli RPCClient, currentBlockHeight uint64, p
 
 	ring, err := SelectDecoys(rand.New(rand.NewSource(time.Now().UnixNano())), indx, maxIndx)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to select decoys: %w", err)
 	}
 
 	keyOffset, err := BuildKeyOffsets(ring)
@@ -223,15 +223,8 @@ func (t *Transaction) writeInput2(rpcCli RPCClient, currentBlockHeight uint64, p
 		return fmt.Errorf("failed to generate mask: %w", err)
 	}
 
-	val, ok := prm["amount"].(float64)
-	if !ok {
-		return fmt.Errorf("failed to get amount of input")
-	}
-	_ = val
-
 	t.VinCount += 1
 	t.Inputs = append(t.Inputs, TxInput{
-		// Amount:     uint64(val * 1e12),
 		Type:       0x02,
 		KeyOffsets: keyOffset,
 		KeyImage:   keyImage.ToBytes(),

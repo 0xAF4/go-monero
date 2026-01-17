@@ -169,7 +169,8 @@ func ClsagGen(message Hash, P []util.Key, p util.Key, C []util.Key, z util.Key, 
 	for i != l {
 
 		// sig.s[i] = random scalar
-		sig.S[i] = Hash(randomScalar().Bytes())
+
+		sig.S[i] = Hash(util.RandomScalar().ToBytes())
 
 		// c_p = c * mu_P
 		util.ScMul(&c_p, c, mu_P)
@@ -236,7 +237,7 @@ func hashToScalar(keys []util.Key) util.Key {
 
 func clsagPrepare(z util.Key, D *util.Key, H util.Key, a, aG, aH *util.Key) {
 	*D = util.ScalarMult(&z, &H)                                          // D = z * H_p(P[l])
-	a.FromScalar(randomScalar())                                          // a = random scalar
+	a = util.RandomScalar()                                               // a = random scalar
 	aG.FromPoint(new(edwards25519.Point).ScalarBaseMult(a.KeyToScalar())) // aG = a * G
 	*aH = util.ScalarMult(a, &H)                                          // aH = a * H
 }
