@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -212,7 +213,20 @@ func (c *Client) SendRawTransaction(inHex string, do_not_relay bool) (*map[strin
 
 	resp := make(UniversalRequest)
 	resp.FromJson(response)
-	fullresp := map[string]interface{}(resp)
+
+	fullresp := map[string]interface{}{}
+	for key, val := range resp {
+		switch v := val.(type) {
+		case bool:
+			if v {
+				fullresp[key] = val
+			}
+		default:
+			if !slices.Contains([]string{"credits", "top_hash"}, key) {
+				fullresp[key] = val
+			}
+		}
+	}
 
 	if strings.ToLower(resp["status"].(string)) != "ok" {
 		return &fullresp, fmt.Errorf("error, request is not ok!")
