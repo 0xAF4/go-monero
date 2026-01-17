@@ -87,9 +87,7 @@ func (c *Client) GetTransactions(txIds []string) (*[]map[string]interface{}, err
 	for _, val := range resp["txs"].([]interface{}) {
 		vvv := val.(map[string]interface{})
 		data, _ := hex.DecodeString(vvv["as_hex"].(string))
-		hexTx := types.Transaction{
-			Raw: data,
-		}
+		hexTx := types.Transaction{Raw: data}
 		hexTx.ParseTx()
 
 		v64arr := []uint64{}
@@ -103,6 +101,7 @@ func (c *Client) GetTransactions(txIds []string) (*[]map[string]interface{}, err
 			"output_indices": v64arr,
 			"block_height":   vvv["block_height"],
 			"extra":          []byte(hexTx.Extra),
+			"data":           data,
 		}
 		txs = append(txs, tx)
 	}
@@ -200,7 +199,7 @@ func (c *Client) GetOuts(indxs []uint64) ([]*map[string]interface{}, error) {
 	return outs, nil
 }
 
-func (c *Client) SendRawTransaction(inHex string) (*bool, error) {
+func (c *Client) SendRawTransaction(inHex string) (*map[string]interface{}, error) {
 	req := UniversalRequest{
 		"tx_as_hex":    inHex,
 		"do_not_relay": false,
@@ -213,13 +212,13 @@ func (c *Client) SendRawTransaction(inHex string) (*bool, error) {
 
 	resp := make(UniversalRequest)
 	resp.FromJson(response)
+	fullresp := map[string]interface{}(resp)
 
 	if strings.ToLower(resp["status"].(string)) != "ok" {
-		return nil, fmt.Errorf("error, request is not ok!")
+		return &fullresp, fmt.Errorf("error, request is not ok!")
 	}
 
-	r := true
-	return &r, nil
+	return &fullresp, nil
 }
 
 func toUint64(v interface{}) (uint64, bool) {
