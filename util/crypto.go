@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"filippo.io/edwards25519"
+	"github.com/shopspring/decimal"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -511,4 +512,19 @@ func ScalarFromUint64(v uint64) *edwards25519.Scalar {
 		panic(err) // или обрабатывай ошибку
 	}
 	return sc
+}
+
+func XmrToAtomic(xmr float64, e int64) uint64 {
+	d := decimal.NewFromFloat(xmr)
+	multiplier := decimal.NewFromInt(e)
+	result := d.Mul(multiplier)
+	return uint64(result.IntPart())
+}
+
+func AtomicToXmr(atomic uint64, e int64) float64 {
+	d := decimal.NewFromUint64(atomic)
+	divisor := decimal.NewFromInt(e)
+	result := d.Div(divisor)
+	f, _ := result.Float64()
+	return f
 }

@@ -541,7 +541,7 @@ func DecodeRctAmount(txPubKey []byte, privateViewKey []byte, outputIndex uint64,
 		amount |= uint64(decrypted) << (8 * i)
 	}
 
-	return float64(amount) / 1e12, nil
+	return util.AtomicToXmr(amount, 1e12), nil
 }
 
 // decodeRctAmount decodes an encrypted RCT amount
@@ -596,7 +596,7 @@ func generateBulletproofPlusMask(txPubKey []byte, privateViewKey []byte, outputI
 
 func EncryptRctAmount(amount float64, pubViewKey []byte, txSecretKey []byte, outputIndex uint64) (HAmount, error) {
 	// Конвертируем amount в uint64 (предполагаем, что amount уже в atomic units)
-	amountAtomic := uint64(amount * 1e12)
+	amountAtomic := util.XmrToAtomic(amount, 1e12)
 
 	// Получаем shared secret (shared = 8 * txSecretKey * pubViewKey)
 	shared, err := util.SharedSecret(pubViewKey, txSecretKey)
@@ -646,7 +646,7 @@ func EncryptRctAmount(amount float64, pubViewKey []byte, txSecretKey []byte, out
 // - G is the base point, H is the second base point
 func CalcOutPk(amount float64, pubViewKey []byte, pubSpendKey []byte, txSecretKey []byte, outputIndex uint64) (*edwards25519.Scalar, Hash, error) {
 	// Convert amount to atomic units
-	amountAtomic := uint64(amount * 1e12)
+	amountAtomic := util.XmrToAtomic(amount, 1e12)
 
 	// ВАЖНО: Сначала вычисляем shared secret правильно
 	// В Monero: shared_secret = r * A (где r - tx secret key, A - pub view key)

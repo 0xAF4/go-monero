@@ -300,7 +300,7 @@ func (t *Transaction) writeOutput2(prm TxPrm) error {
 	})
 
 	t.BlindScalars = append(t.BlindScalars, blind)
-	t.BlindAmounts = append(t.BlindAmounts, uint64(prm["amount"].(float64)*1e12))
+	t.BlindAmounts = append(t.BlindAmounts, util.XmrToAtomic(prm["amount"].(float64), 1e12))
 
 	return nil
 }

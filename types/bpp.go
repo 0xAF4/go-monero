@@ -648,7 +648,7 @@ func (t *Transaction) calculatePseudoOuts() ([]Hash, error) {
 		randomMask := util.RandomScalar()
 		t.InputScalars = append(t.InputScalars, randomMask.KeyToScalar())
 		sumpouts.Add(sumpouts, randomMask.KeyToScalar())
-		amountAtomic := uint64(t.PInputs[i]["amount"].(float64) * 1e12)
+		amountAtomic := util.XmrToAtomic(t.PInputs[i]["amount"].(float64), 1e12)
 		pseudoOut, err := CalcCommitment(amountAtomic, randomMask.ToBytes())
 		if err != nil {
 			return []Hash{}, fmt.Errorf("Error of calc commitment: %w", err)
@@ -658,7 +658,7 @@ func (t *Transaction) calculatePseudoOuts() ([]Hash, error) {
 	}
 
 	lastI := len(pseudoOuts) - 1
-	amountAtomic := uint64(t.PInputs[lastI]["amount"].(float64) * 1e12)
+	amountAtomic := util.XmrToAtomic(t.PInputs[lastI]["amount"].(float64), 1e12)
 
 	sumouts, err := CalcScalars(t.BlindScalars)
 	if err != nil {
