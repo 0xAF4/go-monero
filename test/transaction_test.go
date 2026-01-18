@@ -62,3 +62,9 @@ func Test_Transaction_CheckBalanceFromHex(t *testing.T) {
 		fmt.Printf("  - TX checkOutputs find in tx: %.12f; PaymentID: %d", funds, paymentID)
 	}
 }
+
+func Test_Transaction_CreateEmptyTransaction(t *testing.T) {
+	types.SetTest(true)
+	tx := types.NewEmptyTransaction()
+	fmt.Printf("SecretKey: %x\n", tx.SecretKey)
+}

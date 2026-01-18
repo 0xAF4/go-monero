@@ -3,6 +3,7 @@ package util
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -74,11 +75,21 @@ func (p *Key) KeyToPoint() *edwards25519.Point {
 	return point
 }
 
+func SetTest(b bool) {
+	isTest = b
+}
+
+var isTest = false
+
 func RandomScalar() (result *Key) {
 	result = new(Key)
 	var reduceFrom [KeyLength * 2]byte
 	tmp := make([]byte, KeyLength*2)
-	rand.Read(tmp)
+	if !isTest {
+		rand.Read(tmp)
+	} else {
+		binary.LittleEndian.PutUint64(tmp[:8], 1)
+	}
 	copy(reduceFrom[:], tmp)
 	ScReduce(result, &reduceFrom)
 	return
