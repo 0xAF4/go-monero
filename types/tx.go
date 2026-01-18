@@ -590,14 +590,10 @@ func generateBulletproofPlusMask(txPubKey []byte, privateViewKey []byte, outputI
 // - x is the blinding factor (mask) derived from shared secret
 // - a is the amount in atomic units
 // - G is the base point, H is the second base point
-func CalcOutPk(amount float64, pubViewKey []byte, pubSpendKey []byte, txSecretKey []byte, outputIndex uint64) (*edwards25519.Scalar, Hash, error) {
+func CalcOutPk(derivation *util.Key, outputIndex uint64, amount float64, pubSpendKey []byte) (*edwards25519.Scalar, Hash, error) {
 	// Convert amount to atomic units
 	amountAtomic := util.XmrToAtomic(amount, 1e12)
-
-	sharedSecret, err := util.SharedSecret(pubViewKey, txSecretKey)
-	if err != nil {
-		return nil, Hash{}, fmt.Errorf("failed to calc sharedsecret: %w", err)
-	}
+	sharedSecret := derivation.ToBytes2()
 
 	// Compute Hs(shared_secret || index) - derivation scalar
 	hashInput := append(sharedSecret, util.EncodeVarint(outputIndex)...)
