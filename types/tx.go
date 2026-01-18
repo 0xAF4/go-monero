@@ -579,45 +579,6 @@ func generateBulletproofPlusMask(txPubKey []byte, privateViewKey []byte, outputI
 	return mask, nil
 }
 
-func EncryptRctAmount(amount float64, pubViewKey []byte, txSecretKey []byte, outputIndex uint64) (HAmount, error) {
-	// Конвертируем amount в uint64 (предполагаем, что amount уже в atomic units)
-	amountAtomic := util.XmrToAtomic(amount, 1e12)
-
-	// Получаем shared secret (shared = 8 * txSecretKey * pubViewKey)
-	shared, err := util.SharedSecret(pubViewKey, txSecretKey)
-	if err != nil {
-		return [8]byte{}, err
-	}
-
-	// Вычисляем Hs = sc_reduce32(util.Keccak256(shared || varint(index)))
-	hashInput := append(shared, util.EncodeVarint(outputIndex)...)
-	hsHash := util.Keccak256(hashInput)
-
-	// Для получения скаляра используем SetUniformBytes (ожидает 64 байта)
-	hsHash64 := make([]byte, 64)
-	copy(hsHash64, hsHash)
-	hsScalar := new(edwards25519.Scalar)
-	if _, err := hsScalar.SetUniformBytes(hsHash64); err != nil {
-		return [8]byte{}, err
-	}
-	hsBytes := hsScalar.Bytes()
-
-	// amountMask = util.Keccak256("amount" || hsBytes)
-	amountMask := util.Keccak256(append([]byte("amount"), hsBytes...))
-
-	// Конвертируем amount в байты (little-endian)
-	amountBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(amountBytes, amountAtomic)
-
-	// XOR первых 8 байт маски
-	var encrypted [8]byte
-	for i := 0; i < 8; i++ {
-		encrypted[i] = amountBytes[i] ^ amountMask[i]
-	}
-
-	return encrypted, nil
-}
-
 // func CalcOutPk(pubViewKey []byte, pubSpendKey []byte, txSecretKey []byte, outputIndex uint64) (Hash, error) {
 // CalcOutPk calculates the output commitment (outPk) for a Monero RingCT transaction
 // This is a Pedersen commitment: C = xG + aH where:

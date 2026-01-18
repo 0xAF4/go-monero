@@ -289,7 +289,7 @@ func (t *Transaction) writeOutput2(prm TxPrm) error {
 		return fmt.Errorf("failed to derive view tag: %w", err)
 	}
 
-	amnt, err := EncryptRctAmount(prm["amount"].(float64), pubViewKey[:], t.SecretKey[:], currentIndex)
+	amnt, err := util.EncryptRctAmount(&derivation, currentIndex, prm["amount"].(float64))
 	if err != nil {
 		return fmt.Errorf("failed to encrypt amount: %w", err)
 	}

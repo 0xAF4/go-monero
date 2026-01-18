@@ -1,7 +1,10 @@
 package util
 
 import (
+	"encoding/binary"
 	"fmt"
+
+	"filippo.io/edwards25519"
 )
 
 func CreateKeyImage(pubSpendKey, secSpendKey, secViewKey, txPubKey *Key, outIndex uint64) (*Key, *Key, error) {
@@ -99,6 +102,42 @@ func DeriveSecretKey(derivation *Key, outIndex uint64, base *Key) (derivedKey Ke
 	scalar := derivationToScalar(derivation, outIndex)
 	ScAdd(&derivedKey, base, &scalar)
 	return
+}
+
+func EncryptRctAmount(derivation *Key, outputIndex uint64, amount float64) ([8]byte, error) {
+	// Конвертируем amount в uint64 (предполагаем, что amount уже в atomic units)
+	amountAtomic := XmrToAtomic(amount, 1e12)
+
+	// Получаем shared secret (shared = 8 * txSecretKey * pubViewKey)
+	shared := derivation.ToBytes2()
+
+	// Вычисляем Hs = sc_reduce32(util.Keccak256(shared || varint(index)))
+	hashInput := append(shared, EncodeVarint(outputIndex)...)
+	hsHash := Keccak256(hashInput)
+
+	// Для получения скаляра используем SetUniformBytes (ожидает 64 байта)
+	hsHash64 := make([]byte, 64)
+	copy(hsHash64, hsHash)
+	hsScalar := new(edwards25519.Scalar)
+	if _, err := hsScalar.SetUniformBytes(hsHash64); err != nil {
+		return [8]byte{}, err
+	}
+	hsBytes := hsScalar.Bytes()
+
+	// amountMask = util.Keccak256("amount" || hsBytes)
+	amountMask := Keccak256(append([]byte("amount"), hsBytes...))
+
+	// Конвертируем amount в байты (little-endian)
+	amountBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(amountBytes, amountAtomic)
+
+	// XOR первых 8 байт маски
+	var encrypted [8]byte
+	for i := 0; i < 8; i++ {
+		encrypted[i] = amountBytes[i] ^ amountMask[i]
+	}
+
+	return encrypted, nil
 }
 
 func GenerateKeyImage(privKey *Key) (keyImage Key) {
