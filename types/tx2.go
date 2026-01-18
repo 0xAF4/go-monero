@@ -256,11 +256,6 @@ func (t *Transaction) writeOutput2(prm TxPrm) error {
 		return fmt.Errorf("failed to decode address: %w", err)
 	}
 
-	viewTag, err := DeriveViewTag(pubViewKey[:], t.SecretKey[:], currentIndex) // correct ✅
-	if err != nil {
-		return fmt.Errorf("failed to derive view tag: %w", err)
-	}
-
 	mPubViewKey := util.Key(pubViewKey)
 	mTxSecretKey := util.Key(t.SecretKey)
 	mTxPublicKey := util.Key(t.PublicKey)
@@ -287,6 +282,11 @@ func (t *Transaction) writeOutput2(prm TxPrm) error {
 	derivedKey, ok := util.DerivePublicKey(&derivation, currentIndex, &mPubSpendKey)
 	if !ok {
 		return fmt.Errorf("derive public key failed")
+	}
+
+	viewTag, err := util.DeriveViewTag(&derivation, currentIndex) // correct ✅
+	if err != nil {
+		return fmt.Errorf("failed to derive view tag: %w", err)
 	}
 
 	amnt, err := EncryptRctAmount(prm["amount"].(float64), pubViewKey[:], t.SecretKey[:], currentIndex)

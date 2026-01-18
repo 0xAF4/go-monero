@@ -81,6 +81,20 @@ func DerivePublicKey(derivation *Key, outIndex uint64, base *Key) (derivedKey Ke
 	return
 }
 
+func DeriveViewTag(derivation *Key, index uint64) (byte, error) {
+	sharedSecret := derivation.ToBytes2()
+
+	// Compute view tag per Monero: H[salt||derivation||varint(index)], salt is 8 bytes "view_tag"
+	data := make([]byte, 0, 8+len(sharedSecret)+10)
+	data = append(data, []byte("view_tag")...) // 8 bytes without null terminator
+	data = append(data, sharedSecret...)
+	data = append(data, EncodeVarint(index)...)
+	viewTagHash := Keccak256(data)
+	viewTag := viewTagHash[0]
+
+	return viewTag, nil
+}
+
 func DeriveSecretKey(derivation *Key, outIndex uint64, base *Key) (derivedKey Key) {
 	scalar := derivationToScalar(derivation, outIndex)
 	ScAdd(&derivedKey, base, &scalar)
