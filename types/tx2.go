@@ -192,6 +192,10 @@ func (t *Transaction) writeInput2(rpcCli RPCClient, currentBlockHeight uint64, p
 		return fmt.Errorf("failed to build key offsets: %w", err)
 	}
 
+	if len(ring) != 16 {
+		return fmt.Errorf("invalid ring size: got %d, expected %d", len(ring), 16)
+	}
+
 	mixins, OrderIndx, err := GetMixins(rpcCli, keyOffset, indx)
 	if err != nil {
 		return fmt.Errorf("Get Mixins Error: %w", err)

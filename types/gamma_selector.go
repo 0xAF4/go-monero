@@ -14,7 +14,7 @@ const (
 	RecentDays   = 1.8
 	RecentRatio  = 0.5
 	GammaShape   = 19.28
-	GammaScale   = 1.0 / 1.61
+	GammaScale   = 1.61
 	MaxGammaDays = 365.0 * 10
 )
 
