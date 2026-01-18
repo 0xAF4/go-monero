@@ -263,9 +263,23 @@ func (t *Transaction) writeOutput2(prm TxPrm) error {
 
 	mPubViewKey := util.Key(pubViewKey)
 	mTxSecretKey := util.Key(t.SecretKey)
+	mTxPublicKey := util.Key(t.PublicKey)
 	mPubSpendKey := util.Key(pubSpendKey)
 
-	derivation, ok := util.GenerateKeyDerivation(&mPubViewKey, &mTxSecretKey)
+	var (
+		derivation util.Key
+		ok         bool
+	)
+
+	if !prm["change_address"].(bool) {
+		derivation, ok = util.GenerateKeyDerivation(&mPubViewKey, &mTxSecretKey)
+	} else {
+		mViewSecretKey, err := util.ParseKeyFromHex(prm["privateViewKey"].(string))
+		if err != nil {
+			return fmt.Errorf("Error of decodind Private View Key for change address")
+		}
+		derivation, ok = util.GenerateKeyDerivation(&mTxPublicKey, &mViewSecretKey)
+	}
 	if !ok {
 		return fmt.Errorf("generate key derivation failed")
 	}

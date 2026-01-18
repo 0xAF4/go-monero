@@ -43,7 +43,7 @@ type TxInput struct {
 	KeyOffsets []uint64 `json:"key_offsets"`
 	KeyImage   Hash     `json:"k_image"`
 	Address    string   `json:"-"`
-	Mixins     []Mixin  `json:"mixins,omitempty"`
+	Mixins     []Mixin  `json:"-"`
 	OrderIndx  int      `json:"-"`
 	InSk       Mixin    `json:"-"`
 }
