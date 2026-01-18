@@ -14,7 +14,7 @@ const (
 	RecentDays   = 1.8
 	RecentRatio  = 0.5
 	GammaShape   = 19.28
-	GammaScale   = 1.61
+	GammaScale   = 1.61 // ✅ БЕЗ деления на 1.61!
 	MaxGammaDays = 365.0 * 10
 )
 
@@ -47,9 +47,11 @@ func sampleGamma(r *rand.Rand, k, theta float64) float64 {
 
 func sampleOutputAgeDays(r *rand.Rand) float64 {
 	if r.Float64() < RecentRatio {
+		// 50% шанс выбрать из недавних (последние 1.8 дня)
 		return r.Float64() * RecentDays
 	}
 
+	// Используем gamma distribution для остальных
 	age := sampleGamma(r, GammaShape, GammaScale)
 	if age > MaxGammaDays {
 		return MaxGammaDays
@@ -76,21 +78,21 @@ func BuildKeyOffsets(indices []uint64) ([]uint64, error) {
 		return nil, errors.New("empty indices")
 	}
 
-	// 1. Копируем и сортируем
+	// Копируем и сортируем (на всякий случай, если ещё не отсортировано)
 	sorted := make([]uint64, len(indices))
 	copy(sorted, indices)
 	sort.Slice(sorted, func(i, j int) bool {
 		return sorted[i] < sorted[j]
 	})
 
-	// 2. Проверка на дубликаты (важно)
+	// Проверка на дубликаты
 	for i := 1; i < len(sorted); i++ {
 		if sorted[i] == sorted[i-1] {
-			return nil, errors.New("duplicate global index")
+			return nil, fmt.Errorf("duplicate global index at position %d: %d", i, sorted[i])
 		}
 	}
 
-	// 3. Строим offsets
+	// Строим offsets
 	offsets := make([]uint64, len(sorted))
 	offsets[0] = sorted[0]
 
@@ -142,4 +144,85 @@ func GetMixins(rpcClient RPCClient, keyOffsets []uint64, inputIndx uint64) (*[]M
 	}
 
 	return mixins, &OrderIndx, nil
+}
+
+func SelectDecoys(rng *rand.Rand, realGlobalIndex uint64, maxGlobalIndex uint64) ([]uint64, error) {
+	const ringSize = 16
+
+	if maxGlobalIndex < ringSize {
+		return nil, fmt.Errorf("not enough outputs: max=%d, need=%d", maxGlobalIndex, ringSize)
+	}
+
+	selected := make(map[uint64]struct{})
+	selected[realGlobalIndex] = struct{}{}
+
+	maxAttempts := 10000
+	attempts := 0
+
+	for len(selected) < ringSize && attempts < maxAttempts {
+		attempts++
+
+		// 1. Генерируем возраст в днях используя gamma distribution
+		ageDays := sampleOutputAgeDays(rng)
+
+		// 2. Конвертируем возраст в блоки
+		ageBlocks := uint64(ageDays * BlocksPerDay)
+
+		// 3. ИСПРАВЛЕНО: правильно вычисляем глобальный индекс
+		var gi uint64
+		if ageBlocks >= maxGlobalIndex {
+			// Слишком старый возраст - выбираем из начала диапазона
+			gi = uint64(rng.Int63n(int64(maxGlobalIndex / 10)))
+		} else {
+			// Вычисляем базовый индекс: чем старше, тем меньше индекс
+			baseIndex := maxGlobalIndex - ageBlocks
+
+			// Добавляем небольшой случайный jitter для разнообразия
+			jitterRange := int64(BlocksPerDay * 0.1) // ±10% от дня в блоках
+			if jitterRange < 1 {
+				jitterRange = 1
+			}
+			jitter := rng.Int63n(jitterRange*2) - jitterRange
+
+			// Применяем jitter
+			if jitter < 0 && baseIndex < uint64(-jitter) {
+				gi = 0
+			} else {
+				gi = uint64(int64(baseIndex) + jitter)
+			}
+
+			// Проверяем границы
+			if gi >= maxGlobalIndex {
+				gi = maxGlobalIndex - 1
+			}
+		}
+
+		// 4. Проверяем, что индекс уникален и не совпадает с реальным
+		if gi == realGlobalIndex {
+			continue
+		}
+		if _, exists := selected[gi]; exists {
+			continue
+		}
+
+		selected[gi] = struct{}{}
+	}
+
+	if len(selected) < ringSize {
+		return nil, fmt.Errorf("failed to select enough unique decoys: got %d after %d attempts",
+			len(selected), attempts)
+	}
+
+	// 5. Конвертируем map в slice
+	ring := make([]uint64, 0, ringSize)
+	for gi := range selected {
+		ring = append(ring, gi)
+	}
+
+	// 6. ✅ ОБЯЗАТЕЛЬНО СОРТИРУЕМ (не перемешиваем!)
+	sort.Slice(ring, func(i, j int) bool {
+		return ring[i] < ring[j]
+	})
+
+	return ring, nil
 }
