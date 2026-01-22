@@ -17,7 +17,7 @@ var cRPCDaemonNodes = []string{
 }
 
 const (
-	cRetriesCount     = 3
+	// cRetriesCount     = 3
 	cErrorTxtTemplate = "Error(%d) of calling %s method: %w"
 	cJSON_RPC         = "/json_rpc"
 

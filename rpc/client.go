@@ -13,12 +13,16 @@ import (
 )
 
 type Client struct {
-	timeout time.Duration
+	timeout      time.Duration
+	retriesCount int
+	hostList     *[]string
 }
 
-func NewDaemonRPCClient(tout time.Duration) *Client {
+func NewDaemonRPCClient(tout time.Duration, retriesCount int, hostList *[]string) *Client {
 	return &Client{
-		timeout: tout,
+		timeout:      tout,
+		retriesCount: retriesCount,
+		hostList:     hostList,
 	}
 }
 

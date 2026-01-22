@@ -16,7 +16,7 @@ const (
 )
 
 func Test_Transaction_CheckBalance(t *testing.T) {
-	client := rpc.NewDaemonRPCClient(timeout)
+	client := rpc.NewDaemonRPCClient(timeout, 0, nil)
 
 	resp, err := client.GetTransactions([]string{TxID})
 	if err != nil {
