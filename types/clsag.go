@@ -237,7 +237,7 @@ func hashToScalar(keys []util.Key) util.Key {
 
 func clsagPrepare(z util.Key, D *util.Key, H util.Key, a, aG, aH *util.Key) {
 	*D = util.ScalarMult(&z, &H)                                          // D = z * H_p(P[l])
-	a = util.RandomScalar()                                               // a = random scalar
+	a.FromBytes(util.RandomScalar().ToBytes())                            // a = random scalar
 	aG.FromPoint(new(edwards25519.Point).ScalarBaseMult(a.KeyToScalar())) // aG = a * G
 	*aH = util.ScalarMult(a, &H)                                          // aH = a * H
 }

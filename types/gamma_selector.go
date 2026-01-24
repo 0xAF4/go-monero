@@ -69,8 +69,25 @@ func getOutputIndex(rpcClient RPCClient, txId string, vout int) (uint64, error) 
 		return 0, fmt.Errorf("invalid output index value: %w", err)
 	}
 
-	indexUint64 := (*resp985)[0]["output_indices"].([]uint64)[vout]
-	return indexUint64, nil
+	if resp985 == nil || len(*resp985) == 0 {
+		return 0, fmt.Errorf("transaction not found: %s", txId)
+	}
+
+	outIndicesIface, ok := (*resp985)[0]["output_indices"]
+	if !ok {
+		return 0, fmt.Errorf("missing output_indices in transaction response")
+	}
+
+	outIndices, ok := outIndicesIface.([]uint64)
+	if !ok {
+		return 0, fmt.Errorf("unexpected output_indices type")
+	}
+
+	if vout >= len(outIndices) {
+		return 0, fmt.Errorf("vout out of range: %d >= %d", vout, len(outIndices))
+	}
+
+	return outIndices[vout], nil
 }
 
 func BuildKeyOffsets(indices []uint64) ([]uint64, error) {
@@ -109,7 +126,16 @@ func getMaxGlobalIndex(rpcClient RPCClient, currentBlockHeight uint64) (uint64, 
 		return 0, err
 	}
 
-	return distrib[len(distrib)-1] - 1, nil
+	if len(distrib) == 0 {
+		return 0, fmt.Errorf("empty output distribution")
+	}
+
+	last := distrib[len(distrib)-1]
+	if last == 0 {
+		return 0, fmt.Errorf("invalid distribution, last value is zero")
+	}
+
+	return last - 1, nil
 }
 
 func GetMixins(rpcClient RPCClient, keyOffsets []uint64, inputIndx uint64) (*[]Mixin, *int, error) {
@@ -119,10 +145,11 @@ func GetMixins(rpcClient RPCClient, keyOffsets []uint64, inputIndx uint64) (*[]M
 	}
 
 	// заполняем outputs
-	var OrderIndx int
+	OrderIndx := -1
 	for i, idx := range indxs {
 		if idx == inputIndx {
 			OrderIndx = i
+			break
 		}
 	}
 
@@ -143,14 +170,22 @@ func GetMixins(rpcClient RPCClient, keyOffsets []uint64, inputIndx uint64) (*[]M
 		})
 	}
 
+	if OrderIndx == -1 {
+		return mixins, &OrderIndx, fmt.Errorf("real output index not found among mixin indices")
+	}
+
 	return mixins, &OrderIndx, nil
 }
 
 func SelectDecoys(rng *rand.Rand, realGlobalIndex uint64, maxGlobalIndex uint64) ([]uint64, error) {
 	const ringSize = 16
 
-	if maxGlobalIndex < ringSize {
+	if maxGlobalIndex+1 < uint64(ringSize) {
 		return nil, fmt.Errorf("not enough outputs: max=%d, need=%d", maxGlobalIndex, ringSize)
+	}
+
+	if maxGlobalIndex == 0 {
+		return nil, fmt.Errorf("invalid maxGlobalIndex: 0")
 	}
 
 	selected := make(map[uint64]struct{})
@@ -162,8 +197,28 @@ func SelectDecoys(rng *rand.Rand, realGlobalIndex uint64, maxGlobalIndex uint64)
 	for len(selected) < ringSize && attempts < maxAttempts {
 		attempts++
 
-		// 1. Генерируем возраст в днях используя gamma distribution
-		ageDays := sampleOutputAgeDays(rng)
+		// 1. Генерируем возраст в днях. Часть выборок — центрируем вокруг
+		// реального выхода, чтобы декойы не оказывались систематически
+		// намного новее реального (что делает реальный индекс минимальным).
+		var ageDays float64
+		// безопасный расчёт возраста реального выхода в днях
+		realAgeDays := float64(0)
+		if realGlobalIndex <= maxGlobalIndex {
+			realAgeDays = float64(maxGlobalIndex-realGlobalIndex) / BlocksPerDay
+		}
+		// с вероятностью 0.7 выбираем декоы в окрестности реального выхода
+		if rng.Float64() < 0.7 {
+			sigma := math.Max(1.0, realAgeDays*0.2)
+			ageDays = realAgeDays + rng.NormFloat64()*sigma
+			if ageDays < 0 {
+				ageDays = 0
+			}
+			if ageDays > MaxGammaDays {
+				ageDays = MaxGammaDays
+			}
+		} else {
+			ageDays = sampleOutputAgeDays(rng)
+		}
 
 		// 2. Конвертируем возраст в блоки
 		ageBlocks := uint64(ageDays * BlocksPerDay)
@@ -172,7 +227,11 @@ func SelectDecoys(rng *rand.Rand, realGlobalIndex uint64, maxGlobalIndex uint64)
 		var gi uint64
 		if ageBlocks >= maxGlobalIndex {
 			// Слишком старый возраст - выбираем из начала диапазона
-			gi = uint64(rng.Int63n(int64(maxGlobalIndex / 10)))
+			sampleRange := maxGlobalIndex / 10
+			if sampleRange < 1 {
+				sampleRange = 1
+			}
+			gi = uint64(rng.Int63n(int64(sampleRange)))
 		} else {
 			// Вычисляем базовый индекс: чем старше, тем меньше индекс
 			baseIndex := maxGlobalIndex - ageBlocks
@@ -184,11 +243,19 @@ func SelectDecoys(rng *rand.Rand, realGlobalIndex uint64, maxGlobalIndex uint64)
 			}
 			jitter := rng.Int63n(jitterRange*2) - jitterRange
 
-			// Применяем jitter
-			if jitter < 0 && baseIndex < uint64(-jitter) {
+			// Применяем jitter (без небезопасных приведений)
+			var giCandidate int64
+			var intBase int64
+			if baseIndex > uint64(math.MaxInt64) {
+				intBase = math.MaxInt64
+			} else {
+				intBase = int64(baseIndex)
+			}
+			giCandidate = intBase + jitter
+			if giCandidate <= 0 {
 				gi = 0
 			} else {
-				gi = uint64(int64(baseIndex) + jitter)
+				gi = uint64(giCandidate)
 			}
 
 			// Проверяем границы
