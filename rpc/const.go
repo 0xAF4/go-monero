@@ -9,7 +9,6 @@ var cRPCDaemonNodes = []string{
 	"https://node.sethforprivacy.com:443",
 	"https://nodes.hashvault.pro:18081",
 	"https://xmr.cryptostorm.is:18081",
-	"https://node.privacyx.co:443",
 	"https://public-monero-node.xyz:443",
 	"https://monero.openinternet.io:443",
 	"https://node.xmr.surf:443",

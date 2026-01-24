@@ -117,7 +117,7 @@ func (c *Client) GetTransactions(txIds []string) (*[]map[string]interface{}, err
 func (c *Client) GetOutputDistribution(currentBlockHeight uint64) ([]uint64, error) {
 	req := UniversalRequest{
 		"amounts":     []uint64{0},
-		"from_height": uint64(0),               // ✅ С НАЧАЛА блокчейна!
+		"from_height": currentBlockHeight - 21000,
 		"to_height":   currentBlockHeight - 10, // ✅ До безопасной вы
 		"cumulative":  true,
 	}
