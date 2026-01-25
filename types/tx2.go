@@ -23,7 +23,7 @@ var isTest = false
 //1. NewEmptyTransaction
 //2. WriteInput
 //3. WriteOutput
-//4. Set Transaction.RctSignature.TxnFee
+//4. CalcFeeDifference
 //5. CalcExtra
 //6. CalcInputs
 //7. CalcOutputs
@@ -67,6 +67,24 @@ func (t *Transaction) WriteInput(prm TxPrm) {
 
 func (t *Transaction) WriteOutput(prm TxPrm) {
 	t.POutputs = append(t.POutputs, prm)
+}
+
+func (t *Transaction) SetFee(fee float64) {
+	t.RctSignature.TxnFee = util.XmrToAtomic(fee, 1e12)
+}
+
+func (t *Transaction) CalcFeeDifference() {
+	inputSM := uint64(0)
+	for _, val := range t.PInputs {
+		inputSM += util.XmrToAtomic(val["amount"].(float64), 1e12)
+	}
+
+	outputSM := uint64(0)
+	for _, val := range t.POutputs {
+		outputSM += util.XmrToAtomic(val["amount"].(float64), 1e12)
+	}
+
+	t.RctSignature.TxnFee = (inputSM - outputSM)
 }
 
 func (t *Transaction) CalcExtra() error {
