@@ -19,6 +19,18 @@ func SetTest(b bool) {
 
 var isTest = false
 
+//Right order of building transaction:
+//1. NewEmptyTransaction
+//2. WriteInput
+//3. WriteOutput
+//4. Set Transaction.RctSignature.TxnFee
+//5. CalcExtra
+//6. CalcInputs
+//7. CalcOutputs
+//8. SignTransaction
+//9. CalcHash
+//10. Serialize and send
+
 func NewEmptyTransaction() *Transaction {
 	// var err error
 	tx := &Transaction{
